@@ -1,0 +1,14 @@
+.local/
+dist/
+artifacts/
+*.tmp.*
+*.user
+*.conf
+*.conf.dpapi
+*.key
+*.invite.json
+*.reply.json
+*.log
+*.zip
+*.msi
+*.jar
