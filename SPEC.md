@@ -56,6 +56,18 @@ Do not promise the absence of vulnerabilities, latency or packet loss. Keep FPS,
 - A full handshake, playing together and real latency need the friend's computer and working UDP forwarding. These checks are not reported as done without the friend.
 - Release: EXE + runtime scripts + README, plus a clean ZIP for the friend without `.local`, keys, worlds or logs.
 
-## Status
+## Status — 2026-10-20
 
-2026-10-20: requirements agreed; the system and the official manifest checked; development started. OS and router settings are unchanged so far.
+- Git initialised on `main`. Commits: the initial specification and the main implementation; follow-up fixes go into a separate commit. No remote is configured.
+- Built the native EXE and the PowerShell network worker. Working location: `dist\MinePair.exe`; data: `dist\.local`. Deleting `dist` also deletes user data — the build does not clean it.
+- Downloaded and verified Minecraft 26.3 (Mojang SHA-1), a portable Temurin Java 25 (Adoptium SHA-256) and the official signed WireGuard. WireGuard was installed with its package ownership recorded. PATH/JAVA_HOME were not changed.
+- Local self-tests pass, including a regression test for importing an invitation after the client setup and preserving component ownership for rollback; the real interface is rendered offscreen.
+- A real vanilla server was started twice with a temporary public test key (the private test key was never stored or shared). A new world was created; Minecraft status/ping/pong answered 26.3, 0/2 players, local ping 0–1 ms. This is not a measurement of the friend's connection.
+- Verified: a clean `stop`, saving of all dimensions, restart and backup creation. After stopping, no own tunnel service and zero rules in our firewall group remain. No unclean-session marker.
+- Verified a full removal of the WireGuard we installed while keeping the world and keys, then reinstalled the signed component for normal use. Tunnel and server are left off.
+- One manual UDP 51820 forwarding rule to the laptop's local IPv4 was added in the router UI. Its name, address and rollback instructions are recorded in the private, ignored `router-manual.json`. TCP 25565 is not forwarded. DMZ and UPnP are off and were not changed.
+- No DHCP reservation was saved yet. If the laptop's address changes, the program compares it with the recorded value and asks to update the manual UDP rule.
+- Limitation: with UPnP off, a manual router rule cannot honestly be removed automatically without access to the router's admin page. The program and the README say so; a full rollback means deleting exactly that rule by hand. No router password or session token is stored anywhere in the project.
+- The test friend key was revoked. A clean friend ZIP contains exactly four files: EXE, Network.ps1, README.md and the public invitation — no private keys, `.local`, worlds or logs.
+- Final OS check: no own service, zero rules in our group, UDP 51820 and TCP 25565 not listening. Two local backups kept.
+- Not verified yet: a real handshake, playing together, port exposure on the friend's computer, real packet loss/jitter and latency over the internet.

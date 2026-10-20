@@ -33,7 +33,7 @@ public sealed class MainForm : Form {
     CheckBox eula;
     FlowLayoutPanel buttons;
     TextBox log;
-    bool busy,closing,networkOn;
+    bool busy,closing,networkOn,serverWasRunning;
     System.Windows.Forms.Timer timer;
     public MainForm() {
         settings=Core.Load();
@@ -48,7 +48,7 @@ public sealed class MainForm : Form {
         role=new ComboBox {DropDownStyle=ComboBoxStyle.DropDownList,Dock=DockStyle.Fill};role.Items.AddRange(new object[]{"My server","I am the friend"});role.SelectedIndex=settings.Role=="host"?0:1;
         hostNick=Input(settings.HostNick);friendNick=Input(settings.FriendNick);endpoint=Input(settings.Endpoint);
         memory=new NumericUpDown {Minimum=2048,Maximum=6144,Increment=512,Value=settings.MemoryMb,Dock=DockStyle.Fill,BackColor=Color.FromArgb(33,40,51),ForeColor=ForeColor};
-        Field(fields,"Mode",role,0,0);Field(fields,"Memory, MB",memory,2,0);Field(fields,"Your nickname",hostNick,0,1);Field(fields,"Friend's nickname",friendNick,2,1);Field(fields,"Host IPv4",endpoint,0,2);
+        Field(fields,"Mode",role,0,0);Field(fields,"Memory, MB",memory,2,0);Field(fields,"Host nickname",hostNick,0,1);Field(fields,"Friend's nickname",friendNick,2,1);Field(fields,"Host IPv4",endpoint,0,2);
         var autoIp=Button("Detect IPv4",()=>Work(()=>{string ip=Core.GetText("https://api.ipify.org").Trim();if(!Core.PublicIp(ip)) throw new Exception("No public IPv4 address received.");Ui(()=>endpoint.Text=ip);},"Public IPv4 detected. Compare it with the WAN address on your router."));fields.Controls.Add(autoIp,3,2);layout.Controls.Add(fields,0,2);
         eula=new CheckBox {Text="I accept the Minecraft EULA to run my own server",Checked=settings.Eula,Dock=DockStyle.Fill};layout.Controls.Add(eula,0,3);
         address=new Label {Dock=DockStyle.Fill,Text="The game address appears once connected",ForeColor=Color.FromArgb(163,182,210)};layout.Controls.Add(address,0,4);
@@ -98,7 +98,7 @@ public sealed class MainForm : Form {
     void ExportInvite() {SaveFields();if(settings.Role!="host")throw new Exception("The server owner creates the invitation.");PairFile invite=Core.Invite(settings);using(var d=new SaveFileDialog {Filter="MinePair invitation|*.invite.json",FileName="MinePair.invite.json"}) if(d.ShowDialog(this)==DialogResult.OK){Core.Write(d.FileName,invite);Log("Send the invitation file to your friend. Compare the public key by voice: "+settings.PublicKey);}}
     void Import() {
         if(Core.SupervisorAlive()||HasTunnel())throw new Exception("Stop the server and the network first.");
-        using(var d=new OpenFileDialog {Filter="MinePair file|*.json"})if(d.ShowDialog(this)==DialogResult.OK) {
+        using(var d=new OpenFileDialog {Filter="MinePair file|*.json",InitialDirectory=Core.Root})if(d.ShowDialog(this)==DialogResult.OK) {
             if(new FileInfo(d.FileName).Length>16384)throw new Exception("The file is too large.");var p=Core.Read<PairFile>(d.FileName);
             if(p.Kind=="invite") {SaveFields();if(settings.Role!="client")throw new Exception("Choose the \"I am the friend\" mode to accept an invitation.");Core.EnsureKey(settings);if(MessageBox.Show(this,"Invitation from "+p.HostNick+" to "+p.FriendNick+".\nCompare the host's public key by voice or in a trusted chat:\n"+p.PublicKey+"\n\nAccept?","Verify friend",MessageBoxButtons.YesNo)!=DialogResult.Yes)return;Core.ImportInvite(settings,p);Reload();Log("Invitation accepted. Create a \"Reply to host\" file and send it to the owner.");}
             else {if(MessageBox.Show(this,"Compare your friend's public key with them:\n"+p.PublicKey+"\n\nAdd this device?","Verify friend",MessageBoxButtons.YesNo)!=DialogResult.Yes)return;Core.AcceptReply(settings,p);Reload();Log("Friend added. Only one device key is allowed.");}
@@ -106,7 +106,7 @@ public sealed class MainForm : Form {
     }
     void ExportReply() {if(settings.Role!="client")throw new Exception("The friend creates the reply after importing the invitation.");using(var d=new SaveFileDialog {Filter="MinePair reply|*.reply.json",FileName="MinePair.reply.json"})if(d.ShowDialog(this)==DialogResult.OK){Core.Write(d.FileName,Core.Reply(settings));Log("Send the reply to the owner and compare the public key: "+settings.PublicKey);}}
     void StartNetwork() {SaveFields();Core.Validate(settings,true);Work(()=>{if(settings.Role=="host")Core.StartServer(settings,Process.GetCurrentProcess().Id);else{Core.TunnelFile(settings);Core.Admin("start");}networkOn=true;},"The secure network is on. If this is the first start, configure the host's router.");}
-    void StopNetwork() {Work(()=>{Core.StopServer();networkOn=false;},"Server stopped; our own tunnel and rules removed. Data kept.");}
+    void StopNetwork() {Work(()=>{Core.StopServer();networkOn=false;},"Server stopped; our tunnel and Windows rules removed. Data kept."+(File.Exists(Path.Combine(Core.Data,"router-manual.json"))?" The manual UDP router rule stays; delete it by following the instructions for a full rollback.":""));}
     void Backup(){Work(()=>Core.Backup("manual"),"World backup saved (if the world exists yet).");}
     void Restore(){if(settings.Role!="host")throw new Exception("The world is stored on the owner's computer.");using(var d=new OpenFileDialog{Filter="Backup|*.zip",InitialDirectory=Path.Combine(Core.Data,"backups")})if(d.ShowDialog(this)==DialogResult.OK&&MessageBox.Show(this,"Replace the current world with the selected backup? A safety backup is made first.","Restore",MessageBoxButtons.YesNo)==DialogResult.Yes){string path=d.FileName;Work(()=>Core.Restore(path),"World restored. The previous state is kept in a backup.");}}
     void Uninstall(){if(MessageBox.Show(this,"This stops the server and our own tunnel and removes only MinePair's rules and its UPnP mapping. WireGuard is removed only if this program installed it and no other tunnels use it. The world and keys are kept. A manual router rule has to be removed by hand. Continue?","Remove network setup",MessageBoxButtons.YesNo)!=DialogResult.Yes)return;Work(()=>{Core.StopServer();Core.Admin("uninstall");networkOn=false;},"Network setup removed. Saves are kept.");}
@@ -119,7 +119,7 @@ public sealed class MainForm : Form {
     void Revoke(){if(settings.Role!="host")throw new Exception("Only the server owner can revoke the friend.");if(Core.SupervisorAlive()||HasTunnel())throw new Exception("Stop the server and the network first.");if(MessageBox.Show(this,"Remove the friend's allowed public key? The next start will require accepting a device reply again.","Revoke access",MessageBoxButtons.YesNo)!=DialogResult.Yes)return;settings.PeerKey="";Core.Write(Core.Config,settings);string path=Path.Combine(Core.Data,"protected",settings.Tunnel+".conf.dpapi");if(File.Exists(path))File.Delete(path);Log("Friend key revoked. Their old tunnel can no longer reach the running server.");}
     void Probe(){Work(()=>{Core.Admin("status");var result=Core.Read<System.Collections.Generic.Dictionary<string,object>>(Path.Combine(Core.Data,"admin-result.json"));Log(Convert.ToString(result["handshake"]));Log(Core.MinecraftPing(settings.HostIp));},"Diagnostics finished.");}
     bool HasTunnel(){try{using(var s=new ServiceController("WireGuardTunnel$"+settings.Tunnel)){return s.Status==ServiceControllerStatus.Running||s.Status==ServiceControllerStatus.Stopped;}}catch{return false;}}
-    void RefreshStatus(){if(busy)return;bool server=Core.SupervisorAlive();bool tunnel=HasTunnel();networkOn=tunnel;state.Text=server?"Server running · starting up or in game":tunnel?"Secure network on":"Server and secure network off";address.Text="Address in Minecraft: "+settings.HostIp+":25565  ·  "+(settings.Role=="host"?"nickname: "+settings.HostNick:"nickname: "+settings.FriendNick);details.Text=tunnel?"The tunnel exists. A running service does not prove the friend is connected.":"New world · vanilla 26.3 · device-key access";}
+    void RefreshStatus(){if(busy)return;bool server=Core.SupervisorAlive();bool tunnel=HasTunnel();if(serverWasRunning&&!server&&tunnel&&settings.Role=="host"){serverWasRunning=false;Log("The server process exited. Removing our network; check the server log.");Work(()=>Core.Admin("stop"),"Network turned off after the server exited.");return;}serverWasRunning=server;networkOn=tunnel;state.Text=server?"Server running · starting up or in game":tunnel?"Secure network on":"Server and secure network off";address.Text="Address in Minecraft: "+settings.HostIp+":25565  ·  "+(settings.Role=="host"?"nickname: "+settings.HostNick:"nickname: "+settings.FriendNick);details.Text=tunnel?"The tunnel exists. A running service does not prove the friend is connected.":"New world · vanilla 26.3 · device-key access";}
     async void HandleClosing(object sender,FormClosingEventArgs e){
         if(closing)return;
         if(busy){e.Cancel=true;MessageBox.Show(this,"Wait for the current operation to finish.");return;}

@@ -6,6 +6,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
@@ -80,6 +81,7 @@ public static class Core {
         PrivateDirectory(Data);
         if(File.Exists(Config)) { var s=Read<Settings>(Config); Validate(s,false); return s; }
         var result = new Settings();
+        if(File.Exists(Path.Combine(Root,"MinePair.invite.json")))result.Role="client";
         byte[] b=new byte[2]; using(var rng=RandomNumberGenerator.Create()) rng.GetBytes(b);
         result.HostIp="10.203." + (16 + b[0]%224) + "." + (4*(b[1]%62)+1);
         var parts=result.HostIp.Split('.'); parts[3]=(int.Parse(parts[3])+1).ToString(); result.FriendIp=string.Join(".",parts);
@@ -205,6 +207,11 @@ public static class Core {
         if(!File.Exists(jarPath)||Hash(jarPath,false)!=(string)jar["sha1"]) { progress("Downloading vanilla server.jar…"); Get((string)jar["url"],jarPath,(string)jar["sha1"],false); }
         s.ServerSha1=(string)jar["sha1"];
         string javaDir=Path.Combine(Data,"java");
+        if(!string.IsNullOrEmpty(s.Java)&&!Path.GetFullPath(s.Java).StartsWith(Path.GetFullPath(javaDir)+"\\",StringComparison.OrdinalIgnoreCase))s.Java="";
+        if((string.IsNullOrEmpty(s.Java)||!File.Exists(s.Java))&&Directory.Exists(javaDir)) {
+            var existing=Directory.GetFiles(javaDir,"java.exe",SearchOption.AllDirectories).Where(p=>Path.GetFileName(Path.GetDirectoryName(p))=="bin").ToArray();
+            if(existing.Length==1)s.Java=existing[0];
+        }
         if(string.IsNullOrEmpty(s.Java)||!File.Exists(s.Java)) {
             progress("Downloading portable Java "+major+"…");
             object[] assets; lock(JsonLock) assets=Json.Deserialize<object[]>(GetText("https://api.adoptium.net/v3/assets/latest/"+major+"/hotspot?architecture=x64&image_type=jre&os=windows&vendor=eclipse"));
@@ -216,7 +223,7 @@ public static class Core {
             var found=Directory.GetFiles(javaDir,"java.exe",SearchOption.AllDirectories).Where(p=>Path.GetFileName(Path.GetDirectoryName(p))=="bin").ToArray();
             if(found.Length!=1) throw new Exception("Could not locate java.exe."); s.Java=found[0];
         }
-        string javaVersion=Run(s.Java,"-XshowSettings:properties -version",null,20000); // exit code verifies executable; version recorded by runtime metadata
+        Run(s.Java,"-version",null,20000);
         Write(Config,s); progress("Components ready. An invitation and the friend's reply are still needed.");
     }
     public static void Extract(string archive,string target) {
@@ -270,6 +277,8 @@ public static class Core {
     public static void StartServer(Settings s,int owner) {
         if(Elevated) throw new Exception("Start MinePair with a normal double-click, without administrator rights. The server must not run elevated.");
         Validate(s,true); if(!File.Exists(s.Java)||!File.Exists(Path.Combine(ServerDir,"server.jar"))) throw new Exception("Prepare the components first.");
+        string manual=Path.Combine(Data,"router-manual.json");
+        if(File.Exists(manual)) {var r=Read<Dictionary<string,object>>(manual);string expected=Convert.ToString(r["internalIp"]);bool present=NetworkInterface.GetAllNetworkInterfaces().Where(n=>n.OperationalStatus==OperationalStatus.Up).SelectMany(n=>n.GetIPProperties().UnicastAddresses).Any(a=>a.Address.ToString()==expected);if(!present)throw new Exception("This computer's local IP changed. Update the single router rule: previous address "+expected+". Instructions are in router-manual.json.");}
         if(Hash(Path.Combine(ServerDir,"server.jar"),false)!=s.ServerSha1) throw new Exception("server.jar was modified. Run the preparation again.");
         if(SupervisorAlive()) throw new Exception("The server is already running.");
         if(File.Exists(Path.Combine(Data,"unclean-session"))) throw new Exception("The previous session ended unexpectedly. Check the world and the log; do not overwrite backups. See the README.");

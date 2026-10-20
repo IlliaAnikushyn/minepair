@@ -4,6 +4,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+Add-Type -AssemblyName System.Security
 $data = Join-Path $Root '.local'
 $resultPath = Join-Path $data 'admin-result.json'
 $journalPath = Join-Path $data 'network-journal.json'
@@ -15,7 +16,7 @@ $handshake = $null
 function Save-Json([string]$Path, $Value) {
     $text = $Value | ConvertTo-Json -Depth 8
     [IO.File]::WriteAllText($Path + '.new', $text, [Text.UTF8Encoding]::new($false))
-    if (Test-Path -LiteralPath $Path) { [IO.File]::Replace($Path + '.new', $Path, $null) }
+    if (Test-Path -LiteralPath $Path) { [IO.File]::Replace($Path + '.new', $Path, [System.Management.Automation.Language.NullString]::Value) }
     else { [IO.File]::Move($Path + '.new', $Path) }
 }
 function Save-Journal { Save-Json $journalPath $script:journal }
@@ -33,6 +34,24 @@ function Check-Settings($s) {
 function Check-Signature([string]$Path) {
     $signature = Get-AuthenticodeSignature -LiteralPath $Path
     if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch '(WireGuard|Jason A\. Donenfeld)') { throw 'The WireGuard signature check failed. Installation cancelled.' }
+}
+function Check-TunnelConfig([string]$Path, $s) {
+    foreach ($name in @('PublicKey','PeerKey')) {
+        if ([string]$s.$name -notmatch '\A[A-Za-z0-9+/]{43}=\z' -or [Convert]::FromBase64String([string]$s.$name).Length -ne 32) { throw 'Invalid profile key.' }
+    }
+    $plain = [Text.Encoding]::UTF8.GetString([Security.Cryptography.ProtectedData]::Unprotect([IO.File]::ReadAllBytes($Path),$null,[Security.Cryptography.DataProtectionScope]::LocalMachine))
+    $ownIp=if($s.Role -eq 'host'){$s.HostIp}else{$s.FriendIp}
+    $peerIp=if($s.Role -eq 'host'){$s.FriendIp}else{$s.HostIp}
+    $pattern='\A\[Interface\]\nPrivateKey = [A-Za-z0-9+/]{43}=\nAddress = '+[regex]::Escape($ownIp)+'/32\n'
+    if($s.Role -eq 'host') { $pattern+='ListenPort = '+[int]$s.Port+'\n' }
+    $pattern+='\n\[Peer\]\nPublicKey = '+[regex]::Escape($s.PeerKey)+'\nAllowedIPs = '+[regex]::Escape($peerIp)+'/32\n'
+    if($s.Role -eq 'client') {
+        if([ipaddress]::Parse([string]$s.Endpoint).AddressFamily -ne 'InterNetwork'){throw 'The host IPv4 is required.'}
+        $pattern+='Endpoint = '+[regex]::Escape($s.Endpoint)+':'+[int]$s.Port+'\nPersistentKeepalive = 25\n'
+    }
+    $pattern+='\z'
+    if($plain -cnotmatch $pattern){throw 'The configuration contains unexpected settings; tunnel not created.'}
+    $plain=$null
 }
 function Product-Code([string]$Msi) {
     $installer = New-Object -ComObject WindowsInstaller.Installer
@@ -110,8 +129,21 @@ try {
             }
             $conf = Join-Path $data ('protected\' + $tunnel + '.conf.dpapi')
             if (!(Test-Path -LiteralPath $conf)) { throw 'No protected tunnel configuration.' }
+            Check-TunnelConfig $conf $s
             $script:journal.active=$true; Save-Journal; Log-Change 'Starting own tunnel; rollback intent saved'
             try {
+                # Establish restrictions on the unique tunnel address BEFORE the adapter exists.
+                $ownIp=if($s.Role -eq 'host'){$s.HostIp}else{$s.FriendIp}
+                $common = @{Group=$group;LocalAddress=$ownIp;Direction='Inbound';Action='Block';Profile='Any';Enabled='True'}
+                if ($s.Role -eq 'host') {
+                    New-NetFirewallRule @common -Name ($tunnel+'-block-tcp-other') -DisplayName 'MinePair: block other TCP ports' -Protocol TCP -LocalPort @('1-25564','25566-65535') | Out-Null
+                    New-NetFirewallRule @common -Name ($tunnel+'-block-udp') -DisplayName 'MinePair: block inner UDP' -Protocol UDP | Out-Null
+                    New-NetFirewallRule @common -Name ($tunnel+'-block-icmp') -DisplayName 'MinePair: block inner ICMP' -Protocol ICMPv4 | Out-Null
+                    New-NetFirewallRule -Name ($tunnel+'-minecraft') -DisplayName 'MinePair: Minecraft from paired friend only' -Group $group -Direction Inbound -Action Allow -Profile Any -Protocol TCP -LocalPort 25565 -LocalAddress $s.HostIp -RemoteAddress $s.FriendIp -Program $java | Out-Null
+                    New-NetFirewallRule -Name ($tunnel+'-wireguard') -DisplayName 'MinePair: encrypted UDP transport' -Group $group -Direction Inbound -Action Allow -Profile Any -Protocol UDP -LocalPort ([int]$s.Port) -Program $wg | Out-Null
+                } else {
+                    New-NetFirewallRule @common -Name ($tunnel+'-block-inbound') -DisplayName 'MinePair: block unsolicited inbound to friend PC' -Protocol Any | Out-Null
+                }
                 & $wg /installtunnelservice $conf 2>&1 | Out-Null
                 if ($LASTEXITCODE -ne 0) { throw 'Could not create the WireGuard tunnel service.' }
                 Set-Service -Name $serviceName -StartupType Manual
@@ -119,16 +151,7 @@ try {
                 for ($i=0; $i -lt 60; $i++) { $adapter=Get-NetAdapter -Name $tunnel -ErrorAction SilentlyContinue; if($adapter) {break}; Start-Sleep -Milliseconds 250 }
                 if (!$adapter) { throw 'The WireGuard network adapter did not appear.' }
                 Disable-NetAdapterBinding -Name $tunnel -ComponentID ms_tcpip6 -ErrorAction Stop | Out-Null
-                $common = @{Group=$group;InterfaceAlias=$tunnel;Direction='Inbound';Action='Block';Profile='Any';Enabled='True'}
-                if ($s.Role -eq 'host') {
-                    New-NetFirewallRule @common -Name ($tunnel+'-block-tcp-other') -DisplayName 'MinePair: block other TCP ports' -Protocol TCP -LocalPort @('1-25564','25566-65535') | Out-Null
-                    New-NetFirewallRule @common -Name ($tunnel+'-block-udp') -DisplayName 'MinePair: block inner UDP' -Protocol UDP | Out-Null
-                    New-NetFirewallRule @common -Name ($tunnel+'-block-icmp') -DisplayName 'MinePair: block inner ICMP' -Protocol ICMPv4 | Out-Null
-                    New-NetFirewallRule -Name ($tunnel+'-minecraft') -DisplayName 'MinePair: Minecraft from paired friend only' -Group $group -Direction Inbound -Action Allow -Profile Any -Protocol TCP -LocalPort 25565 -LocalAddress $s.HostIp -RemoteAddress $s.FriendIp -Program $java -InterfaceAlias $tunnel | Out-Null
-                    New-NetFirewallRule -Name ($tunnel+'-wireguard') -DisplayName 'MinePair: encrypted UDP transport' -Group $group -Direction Inbound -Action Allow -Profile Any -Protocol UDP -LocalPort ([int]$s.Port) -Program $wg | Out-Null
-                } else {
-                    New-NetFirewallRule @common -Name ($tunnel+'-block-inbound') -DisplayName 'MinePair: block unsolicited inbound to friend PC' -Protocol Any | Out-Null
-                }
+                Get-NetFirewallRule -Group $group | Where-Object {$_.Name -ne ($tunnel+'-wireguard')} | Set-NetFirewallRule -InterfaceAlias $tunnel
                 # Firewall rules exist before Java can be launched by the unelevated supervisor.
                 $confDump = & $wgTool show $tunnel allowed-ips 2>&1
                 if ($LASTEXITCODE -ne 0 -or ($confDump -join '') -match '0\.0\.0\.0/0|::/0') { throw 'Could not verify the restricted tunnel routes.' }
