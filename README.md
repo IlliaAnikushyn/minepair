@@ -1,70 +1,70 @@
 # MinePair
 
-A private vanilla Minecraft Java 26.3 server for two Windows x64 computers. Requirements and context: [SPEC.md](SPEC.md).
+Your own Minecraft Java server for two Windows x64 computers: yours and a friend's. A private WireGuard network between just your two computers — a replacement for Radmin VPN and Aternos. Requirements and context: [SPEC.md](SPEC.md).
 
-First version. Official vanilla server.jar, Temurin Java and WireGuard. The server runs without administrator rights; individual network operations ask for UAC. Neither the interface nor a running service proves that the friend is connected. Verification results are recorded in SPEC.md.
+The program is a single file, `MinePair.exe`. Start it with a normal double-click (not "Run as administrator").
 
-## Server owner
+## Playing together
 
-1. Unpack the application into a permanent folder. Start `MinePair.exe` with a normal double-click, not as administrator.
-2. Choose "My server", enter the exact nicknames, the public IPv4 and the memory. The default of 3072 MB targets a 16 GB laptop; it does not guarantee a lag-free game. "Detect IPv4" queries api.ipify.org. Compare the address with the router's WAN address; if it changes, update it and send your friend a new invitation.
-3. Press "Prepare": official downloads only. The Minecraft SHA-1 is checked against the Mojang manifest, the Java SHA-256 against the Adoptium API and the WireGuard Authenticode signature before installation. An existing WireGuard is not reinstalled.
-4. Read and accept the Minecraft EULA: https://www.minecraft.net/eula. The program never accepts it on your behalf.
-5. Create an "Invitation" and send the JSON to your friend. Your friend sends a reply back; import it. Compare the full public keys in a trusted conversation before confirming. These files contain no private keys, but the address and nicknames are still your data; do not publish them.
-6. Press "Start". One tunnel and narrow firewall rules are created, then the server starts. Starting Java and generating the world take a while. Open Minecraft with the matching nickname and use the address shown in the program.
-7. To finish, press "Stop / remove network" and confirm UAC. Wait for the success message. Do not end Java in Task Manager as a normal way to quit.
+**Whoever hosts the server:**
 
-## Friend
+1. Start MinePair → "I host the server".
+2. Enter your nickname and your friend's exactly as in the launcher and accept the Minecraft EULA.
+3. "Start setup". Windows asks for permission once — click "Yes". The program downloads WireGuard, Java and the Minecraft server (latest release) by itself.
+4. Copy the invitation code (it starts with `MP-`) and send it to your friend in any messenger, together with `MinePair.exe`.
+5. Your friend sends a reply code back — paste it and compare the safety code (like `2D51-3B2F`) with your friend.
+6. If the router is not configured yet, the program shows the one port to open (UDP 51820 → this computer).
+7. From then on: "Play". In Minecraft: Multiplayer → Direct Connection → the address from the program ("Copy" button).
 
-Unpack a separate clean copy of the program without the owner's `.local` folder. If the package contains `MinePair.invite.json`, the "I am the friend" mode is selected automatically. Press "Prepare" (only WireGuard is installed), import the invitation, compare the host's public key, create a "Reply to host" and send the JSON to the owner. Once the owner accepts the reply, press "Start" and connect to the address shown with the nickname shown. The friend's router does not need any changes.
+**The friend:**
 
-Never share private keys or your `.local` folder. To revoke the friend's device, the owner stops the network and presses "Revoke friend". In offline mode a nickname/whitelist does not prove identity: the private network is what keeps strangers out.
+1. Start `MinePair.exe` → "I join a friend".
+2. "Start setup" (click "Yes" once in the Windows prompt) — only WireGuard is installed.
+3. Paste the host's code, send the reply code back and compare the safety code.
+4. From then on: "Connect", then the same address in Minecraft. Join with the nickname the program shows.
 
-## Router and the limits of automation
+The friend's router needs no changes.
 
-One forwarding rule is needed: **UDP 51820** to the laptop's local IPv4, same internal port. **Do not open TCP 25565 and do not enable DMZ.** Check the laptop address with `ipconfig`; it may change when switching from Wi-Fi to cable. It helps to reserve the current address for the laptop in the router's DHCP settings, noting the previous value.
+**If the host's public IP changes** (common with home internet), the program notices and shows a short code. The friend pastes it with "Paste code from friend" — no need to pair again.
 
-The "Router" button can create, and later remove, its own UPnP rule **only if UPnP is already enabled**. If it is off, the program does not turn it on. A manual rule is created in the router's admin page; it stays after the application stops and has to be removed there by hand. The program never stores the router password. An automatic rollback of a manual rule cannot honestly be promised without access to the specific router's management.
+## Where things live
 
-Typical path in a router UI: Advanced settings → Port forwarding → Add rule. Rule name: `MinePair_<profile id>`, protocol UDP, external/internal port 51820, the laptop's local IP. To undo, delete only the row with that name. Leave UPnP, DMZ, WAN, DNS and Wi-Fi as they were.
+- Data: `%LOCALAPPDATA%\MinePair` — settings, keys, worlds (`worlds`), backups (`backups`), Java, the Minecraft server, logs. "Settings → Data folder".
+- Helper: the `MinePairHelper` service in `C:\Program Files\MinePair`. It runs as SYSTEM, starts only on request from the program and stops itself after 10 idle minutes. It can perform only a fixed set of actions: install WireGuard, turn MinePair's own tunnel and firewall rules on and off. It accepts commands only from your user account.
+- Helper network state: `C:\ProgramData\MinePair` (Administrators and SYSTEM only).
+
+The first version kept its data in `.local` next to the exe. On first start the new version moves it to `%LOCALAPPDATA%\MinePair` automatically: keys, world, backups and the router rule are preserved.
+
+## Worlds and backups
+
+"Settings → Worlds": several worlds, each with its own Minecraft version (official releases), game mode, difficulty, PvP, hardcore and seed. The matching Java is downloaded automatically. Switch worlds with "Switch world" on the main screen while the server is stopped.
+
+The current world is backed up before every start. The last 10 automatic backups are kept; manual backups are never deleted. "Restore from backup" first saves the current state as a separate backup.
+
+If the computer turned off during a game, the next "Play" warns you, makes a backup and continues.
+
+## Security
+
+- The friend connects only through WireGuard. One UDP port is open on the router; WireGuard does not answer anyone without the friend's key, so to scanners the port looks closed. TCP 25565 is never exposed.
+- The tunnel carries only two `/32` addresses; DNS, the default route and all other traffic are untouched.
+- The server listens only on the tunnel address. The firewall lets only the friend's tunnel IP reach the Minecraft port, and only for MinePair's Java. RCON, query and management are off, nobody is OP.
+- The server runs in offline mode. The nickname whitelist does not verify identity; the private network is what keeps strangers out.
+- Invitation codes carry only public data. The safety code protects against a code being swapped in the chat.
+- The private key is stored with the current user's DPAPI. The network script comes from the program itself when the helper is installed, not from a folder the user can write to. The WireGuard signature is checked against the exact WireGuard LLC certificate.
+- No program protects against malware that already runs under your account or as administrator.
+
+## Uninstalling
+
+"Settings → Remove MinePair from Windows": stops the server and the network, removes the helper, the tunnel and the firewall rules, and WireGuard — if MinePair installed it and there are no other tunnels. Worlds, backups and keys stay in `%LOCALAPPDATA%\MinePair`; you can delete that folder by hand. The router forwarding rule has to be removed in the router settings.
 
 ## Checking the connection
 
-"Check connection" asks for the age of the WireGuard handshake (UAC), then performs a real Minecraft status/ping/pong. On the host itself this is a local check and does not measure the friend's route; the friend has to run it on their computer. The value is rounded to milliseconds: a local `0 ms` does not mean zero latency over the internet. The test does not measure packet loss, jitter, FPS or TPS and does not prove their absence. TCP can hide loss behind retransmissions.
-
-## World and backups
-
-World: `.local\server\world`. Backups: `.local\backups`. A backup is made automatically before restarting a cleanly stopped world. "Back up world" works only while the server is stopped. "Restore" accepts a ZIP with `level.dat` at its root; it validates the paths, extracts into a separate folder, makes a safety backup of the current world and then replaces it. Old backups are not deleted automatically: keep an eye on free space.
-
-Do not edit `server.properties` by hand to publish the server: safe settings are rewritten on every start. Players are not given OP. The server accepts only the two agreed nicknames, listens only on the tunnel IPv4, and RCON/query/management are off.
-
-## Stopping and removal
-
-- "Stop / remove network": sends `stop`, waits for Java to save, removes only our tunnel service and our own rule group. Our UPnP mapping is removed only when the port, target and name match; other rules are never overwritten.
-- "Remove setup": additionally removes WireGuard if MinePair installed it and no other tunnels/configurations exist. Someone else's WireGuard is left alone. The world and keys are kept. A manual router rule must be removed separately.
-- Full removal: run "Remove setup", delete our manual router rule, keep the backups you need, then delete the application folder. Git cannot bring deleted backups back.
-- If UAC is cancelled, nothing was rolled back: an error message is not a successful stop. Run "Stop / remove network" again.
-
-## After a crash
-
-The supervisor tries to stop Java cleanly when the GUI disappears. A sudden power loss can never guarantee the last session was saved. On the next start a leftover tunnel is shown in the interface: press "Stop / remove network". Change log: `.local\network-actions.log`; component ownership: `.local\network-journal.json`; server console: `.local\logs\server-console.log`.
-
-The `.local\unclean-session` marker blocks a new start after an unclean shutdown so the problem is not hidden. First make sure Java and the supervisor have exited, remove the network, copy `.local\server\world` aside, read the log or restore the last good backup. Only after that delete `unclean-session` and start again. Never delete the marker while the server is running.
-
-## Security and limitations
-
-The device private key is stored with Windows DPAPI CurrentUser. The service's working configuration uses DPAPI LocalMachine with an ACL that allows only the owner, Administrators and SYSTEM; after the tunnel is removed the file stays encrypted. The data is not protected against an administrator or against malware already running as the owner. The program does not replace Windows, Java or Minecraft updates. The unsigned EXE of this first build may trigger Windows SmartScreen: the source code and a local build are available. Never disable your antivirus or firewall to run it.
-
-The built-in tests are not a security audit. Playing together, real latency and a handshake with the friend's computer need a separate check. No connection method can guarantee the absence of packet loss, laptop overheating or ISP latency.
-
-Official sources: https://www.minecraft.net/download/server · https://adoptium.net/ · https://www.wireguard.com/ · https://github.com/WireGuard/wireguard-windows/blob/master/docs/enterprise.md
+"Settings → Check connection" shows whether the network is on, when the last handshake with the friend happened, whether Minecraft answers and with what ping, and whether the public or internal IP changed. A TCP ping does not measure packet loss or server TPS.
 
 ## Build
 
-Run `powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1`. It uses the .NET Framework compiler that ships with Windows; no separate SDK is needed.
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Test
+```
 
-## Data and Git
-
-All user data lives in `.local` next to the program and is excluded from Git. Never publish that folder: it contains keys, settings, the world and backups. The `dist` folder holds the build, not user data.
-
-Commits keep the code. Reverting a commit does not undo firewall rules, installed components or router changes: those have their own rollback.
+Uses the .NET Framework 4.8 compiler that ships with Windows; no SDK needed. `-Test` runs the self-tests (pairing codes, validation, worlds, backups, migration of old data, rendering of every screen) without changing anything on the system.

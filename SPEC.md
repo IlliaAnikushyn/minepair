@@ -29,7 +29,7 @@ Do not promise the absence of vulnerabilities, latency or packet loss. Keep FPS,
 - Minecraft listens on the tunnel IP only; the game TCP port is never forwarded on the router.
 - On the host the firewall allows Minecraft TCP only from the friend's tunnel IP, for the specific java.exe and interface. If broad Java rules already exist, verify the protection still holds; never delete other rules silently.
 - The router needs a single WireGuard UDP port. Automatic UPnP is acceptable only if it is already enabled and the port is free. Never enable UPnP, never use DMZ, never change WAN/Wi-Fi/DHCP. Without UPnP, give exact manual instructions and record the change.
-- Network setup and rollback run in a separate short-lived elevated worker. The server and the regular GUI never run as administrator.
+- Network setup and rollback are performed by the MinePair helper service (see version 2). The server and the regular GUI never run as administrator.
 
 ## Interface and behaviour
 
@@ -71,3 +71,19 @@ Do not promise the absence of vulnerabilities, latency or packet loss. Keep FPS,
 - The test friend key was revoked. A clean friend ZIP contains exactly four files: EXE, Network.ps1, README.md and the public invitation — no private keys, `.local`, worlds or logs.
 - Final OS check: no own service, zero rules in our group, UDP 51820 and TCP 25565 not listening. Two local backups kept.
 - Not verified yet: a real handshake, playing together, port exposure on the friend's computer, real packet loss/jitter and latency over the internet.
+
+## Version 2 — 2026-10-21 (after review and user interviews)
+
+First-time users could not figure out how to play together (file exchange, 13 buttons, router). Decisions:
+
+- The owner always hosts the server; both players use offline-mode nicknames.
+- A first-run wizard (role → nicknames + EULA → setup → code exchange → router), then a single "Play / Stop" screen with the friend's status, the address and a copy button. Everything else lives in "Settings".
+- Short text codes `MP-…` (base64url + 4 bytes of SHA-256 to catch copy/paste damage) replace the JSON files. A safety code derived from both public keys is compared by voice; the host confirms it before the friend's key is added.
+- Public IP changes: the host detects them and shows a short new-address code; the friend pastes it without re-pairing (the host key stays pinned, so such a code cannot redirect the friend to another server).
+- One UAC prompt: the `MinePairHelper` service (SYSTEM, manual start, start right and pipe access only for the installing user, stops itself after 10 idle minutes). The exe is copied to Program Files and the network script is written from the exe's own resource. The network journal, the protected copy of the tunnel configuration and the results live in `ProgramData\MinePair` (SYSTEM/Administrators only). This removes the privilege escalation through a replaced `Network.ps1` in a user-writable folder.
+- One exe; data in `%LOCALAPPDATA%\MinePair`, automatic migration from the first version's `.local`.
+- Multiple worlds (version from the official releases, game mode, difficulty, PvP, hardcore, seed), with the matching Java version from Mojang's metadata.
+- Review fixes: an abandoned Java process blocks backups and starts and is offered for termination; key recovery after an interrupted generation; the supervisor holds a handle to the owner process; a clear message when UAC is cancelled; rotation of automatic backups (10); the crash marker is cleared by a confirmation in the program together with a world backup; exact WireGuard LLC signature (EV, SERIALNUMBER=4227913); the MSI is downloaded and verified by the service in an admin-only folder; virtual adapters (Radmin and similar) are not mistaken for the local IP; WireGuard is removed only if the product code in the registry belongs to WireGuard; the script is written with a BOM for PowerShell 5.1.
+- Router: a DHCP reservation for the laptop was added; the UDP 51820 forwarding already existed; UPnP and DMZ stay off and unchanged. The router's WAN IP matches the address seen from the internet (no CGNAT), but the ISP assigns it over DHCP, so it may change.
+- Live check 2026-10-21 (temporary public "friend" key, private half never stored, key revoked afterwards): the service was started by a regular user through the pipe, the tunnel and 5 firewall rules were created, Minecraft 26.3 listened only on its tunnel address port 25565 and answered after 30 s (local ping 2 ms — not a measurement of the friend's route). After stopping: no tunnel, 0 rules, port 25565 not listening, no crash marker. A handshake with a real friend and playing together are NOT verified yet.
+- Found during the check: (1) .NET Framework writes a BOM into child process stdin when the console is UTF-8 — keys are now computed in the program (X25519 per RFC 7748, verified with the test vectors), so wg.exe is not needed for keys; (2) applications started from an MSIX-packaged app write AppData into the package's virtualised folder, which the SYSTEM service cannot see. A normal double-click launch is not affected.
