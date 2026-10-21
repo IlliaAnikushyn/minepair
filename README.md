@@ -12,7 +12,7 @@ The program is a single file, `MinePair.exe`. Start it with a normal double-clic
 2. Enter your nickname and your friend's exactly as in the launcher and accept the Minecraft EULA.
 3. "Start setup". Windows asks for permission once — click "Yes". The program downloads WireGuard, Java and the Minecraft server (latest release) by itself.
 4. Copy the invitation code (it starts with `MP-`) and send it to your friend in any messenger, together with `MinePair.exe`.
-5. Your friend sends a reply code back — paste it and compare the safety code (like `2D51-3B2F`) with your friend.
+5. Your friend sends a reply code back — paste it and compare the safety code (like `2D51-3B2F-9C04`) with your friend.
 6. If the router is not configured yet, the program shows the one port to open (UDP 51820 → this computer).
 7. From then on: "Play". In Minecraft: Multiplayer → Direct Connection → the address from the program ("Copy" button).
 

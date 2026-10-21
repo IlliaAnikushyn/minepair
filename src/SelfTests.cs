@@ -66,7 +66,7 @@ public static class SelfTests {
             Check(!host.Paired() && !Core.Load().Paired(), "refused reply leaves host unpaired");
             string seen = null;
             Check(Core.ApplyCode(host, reply, safety => { seen = safety; return true; }) == "reply", "host accepts reply");
-            Check(host.PeerKey == client.PublicKey && seen == Core.SafetyCode(host) && seen == Core.SafetyCode(client), "safety code identical on both computers (" + seen + ")");
+            Check(host.PeerKey == client.PublicKey && seen == Core.SafetyCode(host) && seen == Core.SafetyCode(client) && System.Text.RegularExpressions.Regex.IsMatch(seen, @"\A[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}\z"), "48-bit safety code identical on both computers (" + seen + ")");
             Reject(() => Core.ApplyCode(host, Core.ReplyCode(new Settings { Id = host.Id, Role = "client", HostNick = "Host_One", FriendNick = "Friend_Two", HostIp = host.HostIp, FriendIp = host.FriendIp, Endpoint = "8.8.4.4", PublicKey = Key(70), PeerKey = host.PublicKey }), null), "second friend device rejected while paired");
 
             host.Endpoint = "1.1.1.1";

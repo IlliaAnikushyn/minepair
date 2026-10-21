@@ -474,7 +474,7 @@ public sealed class MainForm : Form {
         var card = Card(p, 96);
         card.Controls.Add(new Label { Text = "Safety code", Font = Ui.F(9.5f, FontStyle.Regular), ForeColor = Ui.Muted, AutoSize = true, Location = new Point(20, 14) });
         card.Controls.Add(new Label { Text = Core.SafetyCode(settings), Font = new Font("Consolas", 20f, FontStyle.Bold), ForeColor = Ui.Text, AutoSize = true, Location = new Point(18, 36) });
-        card.Controls.Add(new Label { Text = "Your friend sees the same one.\nCompare it by voice or in chat.", Font = Ui.F(9.5f, FontStyle.Regular), ForeColor = Ui.Muted, AutoSize = true, Location = new Point(260, 34) });
+        card.Controls.Add(new Label { Text = "Your friend sees the same one.\nCompare it by voice or in chat.", Font = Ui.F(9.5f, FontStyle.Regular), ForeColor = Ui.Muted, AutoSize = true, Location = new Point(300, 34) });
         Para(p, "Your Minecraft nickname: " + settings.FriendNick + ". Join the game with exactly this name.");
         Primary(p, "My friend pasted the code — next", () => {
             settings.ReplySent = true;

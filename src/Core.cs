@@ -448,12 +448,13 @@ public static class Core {
     }
 
     // Same value on both computers once both public keys are known; read aloud to rule out a swapped code.
+    // 48 bits: someone who replaces both codes in the chat would need ~2^48 key pairs to fake a match.
     public static string SafetyCode(string hostKey, string friendKey) {
-        byte[] data = Encoding.ASCII.GetBytes("MinePair-v1").Concat(Convert.FromBase64String(hostKey)).Concat(Convert.FromBase64String(friendKey)).ToArray();
+        byte[] data = Encoding.ASCII.GetBytes("MinePair-v2").Concat(Convert.FromBase64String(hostKey)).Concat(Convert.FromBase64String(friendKey)).ToArray();
         byte[] h;
         using (var sha = SHA256.Create()) h = sha.ComputeHash(data);
-        string hex = BitConverter.ToString(h, 0, 4).Replace("-", "");
-        return hex.Substring(0, 4) + "-" + hex.Substring(4);
+        string hex = BitConverter.ToString(h, 0, 6).Replace("-", "");
+        return hex.Substring(0, 4) + "-" + hex.Substring(4, 4) + "-" + hex.Substring(8);
     }
 
     public static string SafetyCode(Settings s) {
