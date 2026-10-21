@@ -112,8 +112,20 @@ public static class Core {
         RestrictDirectory(path, WindowsIdentity.GetCurrent().User);
     }
 
+    static readonly SecurityIdentifier SystemSid = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+    static readonly SecurityIdentifier AdminsSid = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
+
     // SYSTEM and Administrators only: used for the helper's state in ProgramData.
+    // Any user may create folders in ProgramData, so a folder planted before installation (or a junction
+    // pointing elsewhere) is removed instead of reused: its owner could re-grant itself access later.
     public static void AdminDirectory(string path) {
+        if (Directory.Exists(path)) {
+            if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) Directory.Delete(path, false);
+            else {
+                var owner = Directory.GetAccessControl(path, AccessControlSections.Owner).GetOwner(typeof(SecurityIdentifier));
+                if (!owner.Equals(AdminsSid) && !owner.Equals(SystemSid)) Directory.Delete(path, true);
+            }
+        }
         RestrictDirectory(path, null);
     }
 
@@ -121,11 +133,9 @@ public static class Core {
         Directory.CreateDirectory(path);
         var sec = new DirectorySecurity();
         sec.SetAccessRuleProtection(true, false);
-        var sids = new List<SecurityIdentifier> {
-            new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
-            new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null)
-        };
+        var sids = new List<SecurityIdentifier> { SystemSid, AdminsSid };
         if (user != null) sids.Add(user);
+        else sec.SetOwner(AdminsSid);
         foreach (var sid in sids)
             sec.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
         Directory.SetAccessControl(path, sec);
