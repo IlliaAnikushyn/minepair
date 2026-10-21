@@ -60,6 +60,8 @@ public static class Helper {
         var access = PipeAccessRights.ReadData | PipeAccessRights.WriteData | PipeAccessRights.Synchronize;
         using (var pipe = new NamedPipeClientStream(".", PipeName, access, PipeOptions.None, TokenImpersonationLevel.Identification, HandleInheritability.None)) {
             pipe.Connect(15000);
+            // While the helper is stopped any program could create a pipe with this name; only talk to a service.
+            if (!Native.PipeServerIsService(pipe)) throw new UserFacingException("Another program is pretending to be the MinePair helper. Restart Windows and try again.");
             var request = Encoding.UTF8.GetBytes(Core.Serialize(new Dictionary<string, object> { { "action", action } }) + "\n");
             pipe.Write(request, 0, request.Length);
             pipe.Flush();

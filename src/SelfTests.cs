@@ -89,6 +89,12 @@ public static class SelfTests {
             byte[] encrypted = Native.Protect(secret, host.TunnelName());
             Check(Encoding.UTF8.GetString(ProtectedData.Unprotect(encrypted, null, DataProtectionScope.LocalMachine)) == "test secret", "tunnel configuration protected with DPAPI");
             Check(Core.OfflineUuid("Notch") == "b50ad385-829d-3141-a216-7e7d7539ba7f", "offline UUID matches Java UUID.nameUUIDFromBytes");
+            string pipeName = "MinePair-test-" + Guid.NewGuid().ToString("N");
+            using (var server = new System.IO.Pipes.NamedPipeServerStream(pipeName))
+            using (var probe = new System.IO.Pipes.NamedPipeClientStream(".", pipeName)) {
+                probe.Connect(5000);
+                Check(!Native.PipeServerIsService(probe), "pipe served by a user process is not trusted as the helper");
+            }
 
             // worlds
             var world = Core.CreateWorld("Test world", "26.3", "creative", "hard", true, false, "Grüße seed");
