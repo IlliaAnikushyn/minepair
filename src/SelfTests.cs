@@ -37,6 +37,12 @@ public static class SelfTests {
             string hostDir = Path.Combine(temp, "host"), clientDir = Path.Combine(temp, "client");
             var host = Profile(hostDir, "host", Key(1));
             var client = Profile(clientDir, "client", Key(33));
+            Check(Core.IsPrivateDirectory(hostDir) && Core.IsPrivateDirectory(clientDir), "data folder restricted to the user, SYSTEM and Administrators");
+            File.WriteAllText(Path.Combine(hostDir, "probe.txt"), "x");
+            var probeAcl = File.GetAccessControl(Path.Combine(hostDir, "probe.txt")).GetSecurityDescriptorSddlForm(System.Security.AccessControl.AccessControlSections.Access);
+            Core.Load();
+            Check(Core.IsPrivateDirectory(hostDir) && File.GetAccessControl(Path.Combine(hostDir, "probe.txt")).GetSecurityDescriptorSddlForm(System.Security.AccessControl.AccessControlSections.Access) == probeAcl, "loading settings again leaves an already private folder alone");
+            File.Delete(Path.Combine(hostDir, "probe.txt"));
 
             // validation
             foreach (var ip in new[] { "192.168.1.1", "100.64.0.1", "10.0.0.2", "127.0.0.1", "169.254.5.1", "203.0.113.4", "0.0.0.0", "224.0.0.1" }) Check(!Core.PublicIp(ip), "reject non-public endpoint " + ip);

@@ -112,6 +112,10 @@ public static class Core {
         RestrictDirectory(path, WindowsIdentity.GetCurrent().User);
     }
 
+    internal static bool IsPrivateDirectory(string path) {
+        return HasExactAccess(path, new List<SecurityIdentifier> { SystemSid, AdminsSid, WindowsIdentity.GetCurrent().User }, null);
+    }
+
     static readonly SecurityIdentifier SystemSid = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
     static readonly SecurityIdentifier AdminsSid = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
 
@@ -131,14 +135,27 @@ public static class Core {
 
     static void RestrictDirectory(string path, SecurityIdentifier user) {
         Directory.CreateDirectory(path);
-        var sec = new DirectorySecurity();
-        sec.SetAccessRuleProtection(true, false);
         var sids = new List<SecurityIdentifier> { SystemSid, AdminsSid };
         if (user != null) sids.Add(user);
-        else sec.SetOwner(AdminsSid);
+        // Applying a protected ACL makes Windows walk the whole tree (Java, worlds, backups) to re-propagate it.
+        // Settings are loaded often, even while the server runs, so skip the write when nothing would change.
+        if (HasExactAccess(path, sids, user == null ? AdminsSid : null)) return;
+        var sec = new DirectorySecurity();
+        sec.SetAccessRuleProtection(true, false);
+        if (user == null) sec.SetOwner(AdminsSid);
         foreach (var sid in sids)
             sec.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
         Directory.SetAccessControl(path, sec);
+    }
+
+    static bool HasExactAccess(string path, List<SecurityIdentifier> sids, SecurityIdentifier owner) {
+        var current = Directory.GetAccessControl(path);
+        if (!current.AreAccessRulesProtected) return false;
+        if (owner != null && !owner.Equals(current.GetOwner(typeof(SecurityIdentifier)))) return false;
+        var rules = current.GetAccessRules(true, true, typeof(SecurityIdentifier)).Cast<FileSystemAccessRule>().ToList();
+        var inherit = InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
+        return rules.Count == sids.Count && sids.All(sid => rules.Any(r => sid.Equals(r.IdentityReference) && r.AccessControlType == AccessControlType.Allow
+            && (r.FileSystemRights & FileSystemRights.FullControl) == FileSystemRights.FullControl && r.InheritanceFlags == inherit && r.PropagationFlags == PropagationFlags.None));
     }
 
     public static string NewId(int hexChars) {
