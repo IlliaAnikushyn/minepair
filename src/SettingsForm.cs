@@ -137,11 +137,16 @@ public sealed class SettingsForm : Form {
                 Core.Nick(a);
                 Core.Nick(b);
                 if (a.Equals(b, StringComparison.OrdinalIgnoreCase)) throw new UserFacingException("The nicknames must be different.");
+                bool renamed = a != s.HostNick || b != s.FriendNick;
                 s.HostNick = a;
                 s.FriendNick = b;
                 s.MemoryMb = (int)memory.Value;
                 Core.Save(s);
-                Info("Saved.");
+                if (!renamed || !s.Paired()) { Info("Saved."); return; }
+                // The friend's copy of the nicknames came from the invitation; re-sending it updates them without re-pairing.
+                string invite = Core.InviteCode(s);
+                Clipboard.SetText(invite);
+                Info("Saved. Your friend's app still shows the old nicknames. Send them this updated invitation (already copied); they paste it with \"Paste code from friend\".\n\n" + invite);
             });
         }
 

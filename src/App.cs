@@ -761,11 +761,15 @@ public sealed class MainForm : Form {
         if (code == null) return;
         string kind = Core.ApplyCode(settings, code, null);
         bool reconnect = Core.TunnelServiceExists(settings);
-        if (!reconnect) { MessageBox.Show(this, "Friend's address updated.", "MinePair"); return; }
+        if (!reconnect) {
+            MessageBox.Show(this, kind == "update" ? "Friend's address updated." : "Code accepted.", "MinePair");
+            Route();
+            return;
+        }
         Run(() => {
             Helper.Call("stop", 120000);
             Core.StartTunnel(settings, 180000);
-        }, () => { tunnelSince = DateTime.Now; MessageBox.Show(this, kind == "update" ? "Friend's address updated, reconnecting." : "Code accepted, reconnecting.", "MinePair"); Poll(); });
+        }, () => { tunnelSince = DateTime.Now; MessageBox.Show(this, kind == "update" ? "Friend's address updated, reconnecting." : "Code accepted, reconnecting.", "MinePair"); Route(); });
     }
 
     void OpenSettings() {
