@@ -50,7 +50,7 @@ If the computer turned off during a game, the next "Play" warns you, makes a bac
 - The server listens only on the tunnel address. The firewall lets only the friend's tunnel IP reach the Minecraft port, and only for MinePair's Java. RCON, query and management are off, nobody is OP.
 - The server runs in offline mode. The nickname whitelist does not verify identity; the private network is what keeps strangers out.
 - Invitation codes carry only public data. The safety code protects against a code being swapped in the chat.
-- The private key is stored with the current user's DPAPI. The network script comes from the program itself when the helper is installed, not from a folder the user can write to. The WireGuard signature is checked against the exact WireGuard LLC certificate.
+- The private key is stored with the current user's DPAPI. The tunnel configuration WireGuard needs is encrypted with machine-wide DPAPI (the SYSTEM service has to read it), so it is kept only in the admin-only `ProgramData\MinePair` folder; the copy handed to the helper is deleted from your data folder right after the tunnel starts. The network script comes from the program itself when the helper is installed, not from a folder the user can write to. The WireGuard signature is checked against the exact WireGuard LLC certificate.
 - No program protects against malware that already runs under your account or as administrator.
 
 ## Uninstalling

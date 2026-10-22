@@ -752,8 +752,7 @@ public sealed class MainForm : Form {
         SetState("Connecting…", Ui.Yellow, "Turning on the secure network…", "Disconnect", Ui.Red);
         Run(() => {
             EnsureHelper();
-            Core.TunnelFile(settings);
-            Helper.Call("start", 180000);
+            Core.StartTunnel(settings, 180000);
         }, () => { tunnelSince = DateTime.Now; Poll(); }, () => Apply(new Status { Tunnel = Core.TunnelServiceExists(settings) }), true);
     }
 
@@ -765,8 +764,7 @@ public sealed class MainForm : Form {
         if (!reconnect) { MessageBox.Show(this, "Friend's address updated.", "MinePair"); return; }
         Run(() => {
             Helper.Call("stop", 120000);
-            Core.TunnelFile(settings);
-            Helper.Call("start", 180000);
+            Core.StartTunnel(settings, 180000);
         }, () => { tunnelSince = DateTime.Now; MessageBox.Show(this, kind == "update" ? "Friend's address updated, reconnecting." : "Code accepted, reconnecting.", "MinePair"); Poll(); });
     }
 

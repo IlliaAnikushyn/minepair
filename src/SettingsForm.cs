@@ -159,8 +159,7 @@ public sealed class SettingsForm : Form {
                 if (!Ask("Unpair your friend's current computer? To play again you will need to exchange codes again.")) return;
                 s.PeerKey = "";
                 Core.Save(s);
-                string conf = Path.Combine(Core.ProtectedDir, s.TunnelName() + ".conf.dpapi");
-                if (File.Exists(conf)) File.Delete(conf);
+                Core.DeleteTunnelFile(s);
                 Close();
             });
         } else {

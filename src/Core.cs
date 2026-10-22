@@ -337,9 +337,20 @@ public static class Core {
         return text;
     }
 
-    public static void TunnelFile(Settings s) {
+    public static string TunnelFilePath(Settings s) { return Path.Combine(ProtectedDir, s.TunnelName() + ".conf.dpapi"); }
+
+    // The configuration holds the private key under machine-wide DPAPI (the SYSTEM WireGuard service must read it),
+    // so it is protected only by folder permissions. It exists just while the helper validates and copies it.
+    public static void StartTunnel(Settings s, int timeout) {
         PrivateDirectory(ProtectedDir);
-        Atomic(Path.Combine(ProtectedDir, s.TunnelName() + ".conf.dpapi"), Native.Protect(Encoding.UTF8.GetBytes(TunnelText(s, PrivateKey())), s.TunnelName()));
+        Atomic(TunnelFilePath(s), Native.Protect(Encoding.UTF8.GetBytes(TunnelText(s, PrivateKey())), s.TunnelName()));
+        try { Helper.Call("start", timeout); }
+        finally { DeleteTunnelFile(s); }
+    }
+
+    public static void DeleteTunnelFile(Settings s) {
+        string path = TunnelFilePath(s);
+        if (File.Exists(path)) File.Delete(path);
     }
 
     public static bool TunnelServiceExists(Settings s) {
@@ -925,8 +936,7 @@ public static class Core {
         Save(s);
         Backup(w, "auto");
         ServerProperties(s, w);
-        TunnelFile(s);
-        Helper.Call("start", 180000);
+        StartTunnel(s, 180000);
         try {
             if (File.Exists(StopRequest)) File.Delete(StopRequest);
             Process.Start(new ProcessStartInfo(ExePath, "--server-worker " + owner + " " + w.Id) { UseShellExecute = false, CreateNoWindow = true });
