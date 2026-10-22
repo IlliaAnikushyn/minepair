@@ -192,6 +192,8 @@ public static class SelfTests {
             return 1;
         } finally {
             Core.Data = original;
+            // Keep only the report and the screenshots; the profiles, worlds and archives were scratch data.
+            try { Directory.Delete(temp, true); } catch (Exception e) { output.Add("WARNING: could not delete " + temp + ": " + e.Message); }
             File.WriteAllLines(Path.Combine(artifacts, "tests.txt"), output, Encoding.UTF8);
         }
     }
