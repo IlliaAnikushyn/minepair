@@ -1010,6 +1010,10 @@ public static class Core {
                     p.WaitForExit();
                     if (p.ExitCode == 0 && stopSent) File.Delete(UncleanMarker);
                 }
+                // The tunnel exists only for this server. Take it down here as well, so it does not stay up
+                // when the GUI crashed or was killed and nobody else is left to stop it.
+                try { Helper.Call("stop", 120000); }
+                catch (Exception e) { log.WriteLine("MinePair: could not turn off the secure network: " + e.Message); }
             }
             File.Delete(SessionFile);
             if (File.Exists(StopRequest)) File.Delete(StopRequest);
