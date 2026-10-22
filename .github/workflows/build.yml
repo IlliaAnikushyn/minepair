@@ -1,0 +1,30 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and run self-tests
+        shell: powershell
+        run: .\build.ps1 -Test
+
+      - name: Upload executable and test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MinePair-${{ github.sha }}
+          path: |
+            dist/MinePair.exe
+            dist/artifacts/
+          if-no-files-found: warn
