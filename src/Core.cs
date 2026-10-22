@@ -709,11 +709,35 @@ public static class Core {
         if (Directory.Exists(target)) Directory.Delete(target, true);
         progress("Unpacking Java " + major + "…");
         try { Extract(zip, staging); } catch { if (Directory.Exists(staging)) Directory.Delete(staging, true); throw; }
-        Directory.Move(staging, target);
+        MoveDirectory(staging, target);
         File.Delete(zip);
         string java = FindJava(major);
         if (java == null) throw new UserFacingException("Could not find java.exe in the archive.");
         Run(java, "-version", null, 20000);
+    }
+
+    // Antivirus scanners briefly lock files that were just written (a fresh java.exe, for example),
+    // and Directory.Move cannot move between drives, e.g. when the old exe lived on D:.
+    public static void MoveDirectory(string from, string to) {
+        if (!string.Equals(Path.GetPathRoot(Path.GetFullPath(from)), Path.GetPathRoot(Path.GetFullPath(to)), StringComparison.OrdinalIgnoreCase)) {
+            CopyDirectory(from, to);
+            Directory.Delete(from, true);
+            return;
+        }
+        for (int attempt = 1; ; attempt++) {
+            try { Directory.Move(from, to); return; }
+            catch (Exception e) {
+                if (!(e is IOException || e is UnauthorizedAccessException) || attempt >= 20) throw;
+                Thread.Sleep(250 * Math.Min(attempt, 4));
+            }
+        }
+    }
+
+    static void CopyDirectory(string from, string to) {
+        if ((File.GetAttributes(from) & FileAttributes.ReparsePoint) != 0) throw new UserFacingException("A folder to move is a link to another location: " + from);
+        Directory.CreateDirectory(to);
+        foreach (var file in Directory.GetFiles(from)) File.Copy(file, Path.Combine(to, Path.GetFileName(file)));
+        foreach (var dir in Directory.GetDirectories(from)) CopyDirectory(dir, Path.Combine(to, Path.GetFileName(dir)));
     }
 
     public static void Extract(string archive, string target) {
@@ -1138,7 +1162,7 @@ public static class Core {
             Directory.Delete(Data);
         }
         Directory.CreateDirectory(Path.GetDirectoryName(Data));
-        Directory.Move(legacy, Data);
+        MoveDirectory(legacy, Data);
         PrivateDirectory(Data);
         foreach (var stale in new[] { StopRequest, Path.Combine(Data, "server.lock"), SessionFile, Path.Combine(Data, "admin-result.json") })
             if (File.Exists(stale)) File.Delete(stale);
@@ -1171,7 +1195,7 @@ public static class Core {
                 if (!m.Success) continue;
                 string target = Path.Combine(JavaDir, m.Groups[1].Value);
                 Directory.CreateDirectory(target);
-                Directory.Move(dir, Path.Combine(target, Path.GetFileName(dir)));
+                MoveDirectory(dir, Path.Combine(target, Path.GetFileName(dir)));
             }
         }
 
@@ -1192,7 +1216,7 @@ public static class Core {
                 if (m.ContainsKey("javaVersion")) w.JavaMajor = Convert.ToInt32(Obj(m["javaVersion"])["majorVersion"]);
             }
             Directory.CreateDirectory(WorldsDir);
-            Directory.Move(server, WorldDir(w.Id));
+            MoveDirectory(server, WorldDir(w.Id));
             SaveWorld(w);
             s.ActiveWorld = w.Id;
             if (Directory.Exists(BackupsDir)) {

@@ -162,6 +162,13 @@ public static class SelfTests {
             Check(Core.Backups(mw).Count == 1 && Core.Backups(mw)[0].Name.EndsWith("_auto.zip"), "old backups moved under the world");
             Check(!Directory.Exists(legacy) && !File.Exists(Path.Combine(Core.Data, "stop.request")), "legacy folder emptied, stale files dropped");
             Check(!Core.MigrateLegacy(legacy), "migration runs only once");
+            string held = Path.Combine(temp, "held"), heldFile = Path.Combine(held, "java.exe");
+            Directory.CreateDirectory(held);
+            File.WriteAllText(heldFile, "x");
+            var scanner = new FileStream(heldFile, FileMode.Open, FileAccess.Read, FileShare.Read);
+            System.Threading.ThreadPool.QueueUserWorkItem(_ => { System.Threading.Thread.Sleep(700); scanner.Dispose(); });
+            Core.MoveDirectory(held, held + "-moved");
+            Check(File.Exists(Path.Combine(held + "-moved", "java.exe")) && !Directory.Exists(held), "folder move waits for a briefly locked file (antivirus scan)");
 
             // UI: render every screen offscreen without touching the network or the helper
             Core.Data = hostDir;
