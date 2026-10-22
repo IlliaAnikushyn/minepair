@@ -1,0 +1,7 @@
+# Normalise text to LF in the repository; Windows sources are checked out with CRLF.
+* text=auto
+*.cs text eol=crlf
+*.ps1 text eol=crlf
+*.md text eol=crlf
+*.png binary
+*.jpg binary
