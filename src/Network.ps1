@@ -123,6 +123,19 @@ function Stop-OwnNetwork {
     $script:journal.active = $false; Save-Journal; Log-Change 'Stopped own tunnel and removed own firewall rules'
     if ($errors.Count) { throw ($errors -join "`n") }
 }
+function Remove-OwnWireGuard {
+    $other = @(Get-Service -Name 'WireGuardTunnel$*' -ErrorAction SilentlyContinue)
+    $otherConfigs = @(Get-ChildItem -LiteralPath (Join-Path $env:ProgramFiles 'WireGuard\Data\Configurations') -File -ErrorAction SilentlyContinue)
+    if ($other.Count -or $otherConfigs.Count) { throw 'WireGuard kept: you have other WireGuard tunnels. The MinePair network was removed.' }
+    $code = [string]$script:journal.productCode
+    if ($code -notmatch '\A\{[A-Fa-f0-9-]{36}\}\z') { throw 'No verified product code of the installed package; WireGuard was not removed.' }
+    $entry = Get-ItemProperty -LiteralPath ('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\' + $code) -ErrorAction SilentlyContinue
+    $displayName = if ($null -ne $entry -and $entry.PSObject.Properties['DisplayName']) { [string]$entry.DisplayName } else { '' }
+    if ($displayName -notlike 'WireGuard*') { throw 'The recorded package is not WireGuard; nothing was removed.' }
+    $p = Start-Process -FilePath (Join-Path $env:WINDIR 'System32\msiexec.exe') -ArgumentList @('/x',$code,'/qn','/norestart') -WindowStyle Hidden -Wait -PassThru
+    if ($p.ExitCode -notin @(0,1605,3010)) { throw ('WireGuard removal: exit code ' + $p.ExitCode) }
+    $script:journal.installedWireGuard = $false; Save-Journal; Log-Change 'Removed WireGuard installed by MinePair; user data preserved'
+}
 function Physical-LanAddresses {
     $result = @()
     foreach ($adapter in @(Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' })) {
@@ -233,20 +246,14 @@ try {
         }
         'stop' { Stop-OwnNetwork }
         'uninstall' {
-            Stop-OwnNetwork
-            if ($script:journal.installedWireGuard) {
-                $other = @(Get-Service -Name 'WireGuardTunnel$*' -ErrorAction SilentlyContinue)
-                $otherConfigs = @(Get-ChildItem -LiteralPath (Join-Path $env:ProgramFiles 'WireGuard\Data\Configurations') -File -ErrorAction SilentlyContinue)
-                if ($other.Count -or $otherConfigs.Count) { throw 'WireGuard kept: you have other WireGuard tunnels. The MinePair network was removed.' }
-                $code = [string]$script:journal.productCode
-                if ($code -notmatch '\A\{[A-Fa-f0-9-]{36}\}\z') { throw 'No verified product code of the installed package; WireGuard was not removed.' }
-                $entry = Get-ItemProperty -LiteralPath ('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\' + $code) -ErrorAction SilentlyContinue
-                $displayName = if ($null -ne $entry -and $entry.PSObject.Properties['DisplayName']) { [string]$entry.DisplayName } else { '' }
-                if ($displayName -notlike 'WireGuard*') { throw 'The recorded package is not WireGuard; nothing was removed.' }
-                $p = Start-Process -FilePath (Join-Path $env:WINDIR 'System32\msiexec.exe') -ArgumentList @('/x',$code,'/qn','/norestart') -WindowStyle Hidden -Wait -PassThru
-                if ($p.ExitCode -notin @(0,1605,3010)) { throw ('WireGuard removal: exit code ' + $p.ExitCode) }
-                $script:journal.installedWireGuard = $false; Save-Journal; Log-Change 'Removed WireGuard installed by MinePair; user data preserved'
+            $script:journal.routerWanted = $false; Save-Journal
+            # An unreachable router (laptop away from home) must not keep WireGuard installed; report it at the end.
+            $problems = @()
+            try { Stop-OwnNetwork } catch { $problems += $_.Exception.Message }
+            if ($script:journal.installedWireGuard -and !(Get-Service -Name $n.Service -ErrorAction SilentlyContinue)) {
+                try { Remove-OwnWireGuard } catch { $problems += $_.Exception.Message }
             }
+            if ($problems.Count) { throw ($problems -join "`n") }
         }
         'router-add' {
             if ($s.Role -ne 'host') { throw 'Only the host needs a router rule.' }

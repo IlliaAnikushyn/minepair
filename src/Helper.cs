@@ -154,8 +154,23 @@ public static class Helper {
         for (int i = 0; i < 20 && Directory.Exists(Core.HelperDir); i++) {
             try { Directory.Delete(Core.HelperDir, true); } catch { Thread.Sleep(500); }
         }
-        if (Directory.Exists(Core.StateDir)) Directory.Delete(Core.StateDir, true);
+        // The journal is the only record of what MinePair still owns (WireGuard's product code, a router rule).
+        // While it lists anything, it stays so that installing and removing again can finish the job.
+        string journal = Path.Combine(Core.StateDir, "network-journal.json");
+        if (File.Exists(journal) && JournalOwnsSomething(journal)) {
+            foreach (var entry in Directory.GetFileSystemEntries(Core.StateDir).Where(p => !p.Equals(journal, StringComparison.OrdinalIgnoreCase))) {
+                if (Directory.Exists(entry)) Directory.Delete(entry, true); else File.Delete(entry);
+            }
+            warning = (warning == null ? "" : warning + "\n\n") + "MinePair kept a record of what it could not remove yet. Install and remove MinePair again later to finish.";
+        } else if (Directory.Exists(Core.StateDir)) Directory.Delete(Core.StateDir, true);
         return warning;
+    }
+
+    static bool JournalOwnsSomething(string path) {
+        try {
+            var j = Core.Read<Dictionary<string, object>>(path);
+            return new[] { "installedWireGuard", "routerOwned", "active" }.Any(k => j.ContainsKey(k) && Convert.ToBoolean(j[k]));
+        } catch { return true; }
     }
 
     static void CopyWithRetry(string from, string to) {
