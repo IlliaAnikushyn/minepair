@@ -914,9 +914,13 @@ public static class Core {
             Backup(w, "before-restore");
             string world = Path.Combine(WorldDir(w.Id), "world"), old = Path.Combine(Data, "previous-world-" + Guid.NewGuid().ToString("N"));
             bool moved = false;
-            if (Directory.Exists(world)) { Directory.Move(world, old); moved = true; }
-            try { Directory.Move(stage, world); } catch { if (moved) Directory.Move(old, world); throw; }
-            if (moved) Directory.Delete(old, true);
+            if (Directory.Exists(world)) { MoveDirectory(world, old); moved = true; }
+            try { MoveDirectory(stage, world); } catch { if (moved) MoveDirectory(old, world); throw; }
+            // The world is already restored; a copy locked by antivirus is cleaned up on the next restore.
+            if (moved) { try { Directory.Delete(old, true); } catch { } }
+            foreach (var stale in Directory.GetDirectories(Data, "previous-world-*").Where(d => !d.Equals(old, StringComparison.OrdinalIgnoreCase))) {
+                try { Directory.Delete(stale, true); } catch { }
+            }
         } finally {
             if (Directory.Exists(stage)) Directory.Delete(stage, true);
         }
