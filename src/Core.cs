@@ -259,7 +259,10 @@ public static class Core {
             var stdin = p.StandardInput.BaseStream;
             if (input != null) { var bytes = Encoding.ASCII.GetBytes(input); stdin.Write(bytes, 0, bytes.Length); }
             stdin.Close();
-            if (!p.WaitForExit(timeout)) throw new Exception("A component did not respond in time: " + Path.GetFileName(file));
+            if (!p.WaitForExit(timeout)) {
+                try { p.Kill(); } catch { }
+                throw new Exception("A component did not respond in time: " + Path.GetFileName(file));
+            }
             if (p.ExitCode != 0) {
                 string detail = errors.Result.Trim();
                 if (detail == "") detail = output.Result.Trim();

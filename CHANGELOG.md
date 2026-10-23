@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - A router rule created through UPnP was removed on the first stop and never added again, so the friend could connect only once. Every start now adds it back; a refusal by the router shows a warning instead of blocking the game.
 - The secure network stayed on when Java failed to start or exited while the server was being asked to stop.
 - Removing MinePair while the router was unreachable skipped the removal of WireGuard and deleted the record of having installed it. WireGuard is now removed anyway, and the record is kept until everything MinePair owns is gone.
+- A helper tool that did not answer in time (`wg.exe`, `sc.exe`) was left running in the background.
 - Retrying "Try automatically (UPnP)" after a failed attempt reported success without creating the router rule.
 
 ## [0.3.1] - 2026-10-23
