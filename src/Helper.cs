@@ -213,8 +213,11 @@ public static class Helper {
         if (File.Exists(result)) File.Delete(result);
         string ps = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
         string args = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File " + Core.Quote(ScriptPath) + " -Data " + Core.Quote(data) + " -State " + Core.Quote(Core.StateDir) + " -Action " + action;
+        // Shorter than the GUI waits (120 s and more, 10 min for the install): a GUI that gave up
+        // must never see the tunnel appear later without a server.
+        int limit = action == "install" ? 540000 : 100000;
         using (var p = Process.Start(new ProcessStartInfo(ps, args) { UseShellExecute = false, CreateNoWindow = true })) {
-            if (!p.WaitForExit(600000)) { try { p.Kill(); } catch { } throw new Exception("The network operation did not finish within 10 minutes."); }
+            if (!p.WaitForExit(limit)) { try { p.Kill(); } catch { } throw new Exception("The network operation did not finish in time."); }
         }
         if (!File.Exists(result)) throw new Exception("The network operation returned no result.");
         var r = Core.Read<Dictionary<string, object>>(result);

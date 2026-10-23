@@ -10,6 +10,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Removing MinePair while the router was unreachable skipped the removal of WireGuard and deleted the record of having installed it. WireGuard is now removed anyway, and the record is kept until everything MinePair owns is gone.
 - A helper tool that did not answer in time (`wg.exe`, `sc.exe`) was left running in the background.
 - Restoring a backup reported an error after the world had already been restored when antivirus software briefly locked the old copy; folder moves during a restore now retry like other moves.
+- A slow network operation could finish after the app had given up waiting, leaving the secure network on without a server. The helper now gives up first.
 - Retrying "Try automatically (UPnP)" after a failed attempt reported success without creating the router rule.
 
 ## [0.3.1] - 2026-10-23
