@@ -211,16 +211,19 @@ public sealed class MainForm : Form {
         busy = true;
         if (lockUi) content.Enabled = false;
         UseWaitCursor = true;
-        try {
-            await Task.Run(task);
-            if (done != null) done();
-        } catch (Exception e) {
-            if (failed != null) failed();
-            Error(e);
-        } finally {
+        Exception error = null;
+        try { await Task.Run(task); }
+        catch (Exception e) { error = e; }
+        finally {
             busy = false;
             if (!IsDisposed) { content.Enabled = true; UseWaitCursor = false; }
         }
+        // Callbacks run after busy is cleared, so a Poll they start is not skipped,
+        // and an error in done is not reported as a failure of the task.
+        try {
+            if (error == null) { if (done != null) done(); }
+            else { if (failed != null) failed(); Error(error); }
+        } catch (Exception e) { Error(e); }
     }
 
     void Run(Action task, Action done) { Run(task, done, null, true); }
@@ -712,6 +715,7 @@ public sealed class MainForm : Form {
     }
 
     void PlayClicked() {
+        if (busy) throw new UserFacingException("Wait until the current action finishes.");
         if (settings.IsHost()) {
             if (Core.SupervisorAlive()) {
                 SetState("Stopping…", Ui.Yellow, "Saving the world. This takes a few seconds.", "■   Stop", Ui.Red);

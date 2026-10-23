@@ -53,9 +53,12 @@ public sealed class SettingsForm : Form {
         busy = true;
         page.Enabled = false;
         UseWaitCursor = true;
-        try { await Task.Run(task); if (done != null) done(); }
-        catch (Exception e) { Error(e); }
+        Exception error = null;
+        try { await Task.Run(task); }
+        catch (Exception e) { error = e; }
         finally { busy = false; if (!IsDisposed) { page.Enabled = true; UseWaitCursor = false; } }
+        if (error != null) { Error(error); return; }
+        try { if (done != null) done(); } catch (Exception e) { Error(e); }
     }
 
     void Build() {
