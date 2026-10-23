@@ -1254,13 +1254,13 @@ internal static class Native {
         } finally { Marshal.FreeHGlobal(b.Data); }
     }
 
-    [DllImport("kernel32.dll", SetLastError = true)] static extern bool GetNamedPipeServerProcessId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, out uint processId);
-    [DllImport("kernel32.dll", SetLastError = true)] static extern bool ProcessIdToSessionId(uint processId, out uint sessionId);
+    [DllImport("kernel32.dll", SetLastError = true)] static extern bool GetNamedPipeServerSessionId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, out uint sessionId);
 
     // Services run in session 0, where processes of a signed-in user cannot be started.
+    // The session is read from the pipe itself: opening the SYSTEM service process to ask would be denied.
     public static bool PipeServerIsService(System.IO.Pipes.PipeStream pipe) {
-        uint pid, session;
-        return GetNamedPipeServerProcessId(pipe.SafePipeHandle, out pid) && ProcessIdToSessionId(pid, out session) && session == 0;
+        uint session;
+        return GetNamedPipeServerSessionId(pipe.SafePipeHandle, out session) && session == 0;
     }
 }
 }

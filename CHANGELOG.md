@@ -4,6 +4,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Fixed
+- Setup failed with "Another program is pretending to be the MinePair helper": the pipe check could not open the SYSTEM service process as a standard user and rejected the real helper. The session is now read from the pipe itself.
+
 ## [0.3.0] - 2026-10-23
 
 ### Security
