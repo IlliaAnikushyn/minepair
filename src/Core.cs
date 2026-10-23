@@ -104,7 +104,16 @@ public static class Core {
             f.Write(content, 0, content.Length);
             f.Flush(true);
         }
-        if (File.Exists(path)) File.Replace(tmp, path, null); else File.Move(tmp, path);
+        // Antivirus scanners briefly lock files that were just written, as in MoveDirectory.
+        for (int attempt = 1; ; attempt++) {
+            try {
+                if (File.Exists(path)) File.Replace(tmp, path, null); else File.Move(tmp, path);
+                return;
+            } catch (Exception e) {
+                if (!(e is IOException || e is UnauthorizedAccessException) || attempt >= 10) throw;
+                Thread.Sleep(100 * attempt);
+            }
+        }
     }
 
     // Owner, SYSTEM and Administrators only; inherited entries removed.

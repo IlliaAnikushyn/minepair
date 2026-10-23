@@ -13,6 +13,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - A slow network operation could finish after the app had given up waiting, leaving the secure network on without a server. The helper now gives up first.
 - The status was refreshed up to 3 s late after Play, Stop or Connect, and pressing Play during another action showed "Starting…" without starting anything.
 - Retrying "Try automatically (UPnP)" after a failed attempt reported success without creating the router rule.
+- Saving settings or world files could fail with "file in use" while antivirus software scanned the previous version.
 
 ### Changed
 - Stop no longer runs the network shutdown a second time when the server has already turned the secure network off.
