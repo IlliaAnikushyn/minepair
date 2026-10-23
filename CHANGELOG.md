@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-23
+
 ### Security
 - The helper deletes a pre-created or linked `C:\ProgramData\MinePair` folder before installing and makes Administrators its owner.
 - The GUI talks to the helper pipe only if its server runs as a service (session 0).
@@ -44,6 +46,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Verified downloads of the vanilla server, Temurin Java and WireGuard.
 - Backups, restore and rollback of all own network changes.
 
-[Unreleased]: https://github.com/IlliaAnikushyn/MinePair/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/IlliaAnikushyn/MinePair/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/IlliaAnikushyn/MinePair/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/IlliaAnikushyn/MinePair/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/IlliaAnikushyn/MinePair/releases/tag/v0.1.0
