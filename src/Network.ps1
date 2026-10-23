@@ -227,7 +227,8 @@ try {
         }
         'router-add' {
             if ($s.Role -ne 'host') { throw 'Only the host needs a router rule.' }
-            if ($script:journal.routerOwned) { break }
+            # The journal records intent before the router call, so it may claim a rule that was never created.
+            Remove-OwnRouterRule
             $nat = New-Object -ComObject HNetCfg.NATUPnP
             $mappings = $nat.StaticPortMappingCollection
             if ($null -eq $mappings) { throw 'UPnP is off on the router. Add one UDP rule by hand following the instructions.' }

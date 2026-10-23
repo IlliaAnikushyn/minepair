@@ -4,6 +4,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Fixed
+- Retrying "Try automatically (UPnP)" after a failed attempt reported success without creating the router rule.
+
 ## [0.3.1] - 2026-10-23
 
 ### Fixed
