@@ -87,8 +87,6 @@ public static class Core {
     public static string Wg { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "WireGuard", "wireguard.exe"); } }
     public static string WgTool { get { return Path.Combine(Path.GetDirectoryName(Wg), "wg.exe"); } }
 
-    // ---------- files ----------
-
     public static T Read<T>(string path) { lock (JsonLock) return Json.Deserialize<T>(File.ReadAllText(path, Encoding.UTF8)); }
     public static T Parse<T>(string text) { lock (JsonLock) return Json.Deserialize<T>(text); }
     public static string Serialize(object value) { lock (JsonLock) return Json.Serialize(value); }
@@ -180,8 +178,6 @@ public static class Core {
         for (int i = 0; i < result.Length; i++) result[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
         return result;
     }
-
-    // ---------- profile ----------
 
     public static Settings Load() {
         PrivateDirectory(Data);
@@ -285,8 +281,6 @@ public static class Core {
         if (s.IndexOf('"') >= 0 || s.IndexOf('\r') >= 0 || s.IndexOf('\n') >= 0) throw new Exception("Invalid path.");
         return "\"" + s + "\"";
     }
-
-    // ---------- keys ----------
 
     public static void EnsureKey(Settings s) {
         if (File.Exists(PrivateKeyPath)) {
@@ -401,7 +395,6 @@ public static class Core {
         } catch { return false; }
     }
 
-    // ---------- pairing codes ----------
     // A code is "MP-" + base64url(kind | body | first 4 bytes of SHA-256(kind | body)).
     // Codes carry only public data: the checksum catches copy/paste damage, the pinned keys provide security.
 
@@ -585,8 +578,6 @@ public static class Core {
         foreach (var f in typeof(Settings).GetFields()) f.SetValue(to, f.GetValue(from));
     }
 
-    // ---------- network discovery ----------
-
     public static string GetText(string url) {
         ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
         using (var c = new WebClient()) {
@@ -631,8 +622,6 @@ public static class Core {
         }
         return null;
     }
-
-    // ---------- downloads ----------
 
     public static string Hash(string path, bool sha256) {
         using (var f = File.OpenRead(path))
@@ -683,7 +672,6 @@ public static class Core {
 
     public static string ServerJar(World w) { return Path.Combine(VersionDir(w.Version), "server.jar"); }
 
-    // Downloads (if needed) and verifies everything the world needs: server.jar for its version and the matching Java.
     public static void PrepareWorld(World w, Action<string> progress) {
         string dir = VersionDir(w.Version);
         string meta = Path.Combine(dir, "version.json");
@@ -778,8 +766,6 @@ public static class Core {
             }
         }
     }
-
-    // ---------- worlds ----------
 
     public static readonly string[] GameModes = { "survival", "creative", "adventure" };
     public static readonly string[] Difficulties = { "peaceful", "easy", "normal", "hard" };
@@ -891,8 +877,6 @@ public static class Core {
         return hex.Substring(0, 8) + "-" + hex.Substring(8, 4) + "-" + hex.Substring(12, 4) + "-" + hex.Substring(16, 4) + "-" + hex.Substring(20);
     }
 
-    // ---------- backups ----------
-
     public const int AutoBackupsKept = 10;
 
     public static string WorldBackups(World w) { return Path.Combine(BackupsDir, w.Id); }
@@ -941,8 +925,6 @@ public static class Core {
             if (Directory.Exists(stage)) Directory.Delete(stage, true);
         }
     }
-
-    // ---------- server process ----------
 
     public static bool SupervisorAlive() {
         if (!File.Exists(SessionFile)) return false;
@@ -1096,8 +1078,6 @@ public static class Core {
         }
     }
 
-    // ---------- diagnostics ----------
-
     static byte[] VarInt(int value) {
         uint v = unchecked((uint)value);
         var bytes = new List<byte>();
@@ -1142,7 +1122,6 @@ public static class Core {
         public long Milliseconds;
     }
 
-    // Real Minecraft status + ping/pong over the game port.
     public static ServerPing MinecraftPing(string address, int connectTimeout) {
         using (var c = new TcpClient()) {
             var pending = c.ConnectAsync(Ip(address), 25565);
@@ -1186,8 +1165,6 @@ public static class Core {
             }
         }
     }
-
-    // ---------- migration from the first version (.local next to the exe) ----------
 
     public static bool MigrateLegacy(string legacy) {
         if (!File.Exists(Path.Combine(legacy, "settings.json")) || File.Exists(Config)) return false;

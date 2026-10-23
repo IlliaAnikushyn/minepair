@@ -77,7 +77,6 @@ static class Program {
     }
 }
 
-// Shared look: dark theme, one column of content.
 static class Ui {
     public static readonly Color Bg = Color.FromArgb(16, 20, 27);
     public static readonly Color Card = Color.FromArgb(26, 32, 42);
@@ -204,8 +203,6 @@ public sealed class MainForm : Form {
         Shown += (o, e) => { Route(); timer.Start(); };
     }
 
-    // ---------- plumbing ----------
-
     void Error(Exception e) {
         if (!(e is UserFacingException)) {
             try { File.AppendAllText(Path.Combine(Core.Data, "application-errors.log"), DateTime.UtcNow.ToString("o") + " " + e + Environment.NewLine); } catch { }
@@ -282,8 +279,6 @@ public sealed class MainForm : Form {
 
     static bool IsPublic(string ip) { try { return Core.PublicIp(ip); } catch { return false; } }
 
-    // ---------- routing ----------
-
     void Route() {
         settings = Core.Load();
         if (settings.Role == "") ShowWelcome();
@@ -316,8 +311,6 @@ public sealed class MainForm : Form {
         Core.Save(settings);
         Route();
     }
-
-    // ---------- wizard ----------
 
     void ShowWelcome() {
         var p = Page("welcome");
@@ -530,8 +523,6 @@ public sealed class MainForm : Form {
         Route();
     }
 
-    // ---------- main screen ----------
-
     void ShowMain() {
         var p = Page("main");
         bool host = settings.IsHost();
@@ -617,7 +608,6 @@ public sealed class MainForm : Form {
 
     static KeyValuePair<string, Action> B(string text, Action a) { return new KeyValuePair<string, Action>(text, a); }
 
-    // Host: notice a changed public IP and give the friend a one-line update code.
     void CheckEndpoint() {
         if (!settings.Paired()) return;
         Task.Run(() => Core.DetectPublicIp()).ContinueWith(t => {
@@ -831,8 +821,6 @@ public sealed class MainForm : Form {
         Run(() => { if (server) Core.StopServer(); else Helper.Call("stop", 120000); }, () => { closing = true; timer.Stop(); Close(); });
     }
 
-    // ---------- self-test hooks ----------
-
     internal void ShowForTest(string name) {
         Offline = true;
         settings = Core.Load();
@@ -849,7 +837,6 @@ public sealed class MainForm : Form {
     }
 }
 
-// Small modal asking for a pasted code.
 sealed class CodeDialog : Form {
     TextBox box;
 

@@ -39,13 +39,10 @@ public static class Helper {
         } catch { return false; }
     }
 
-    // True when the installed helper is this exact build.
     public static bool UpToDate() {
         if (!Installed()) return false;
         try { return Convert.ToString(Call("version", 30000)["hash"]) == OwnHash(); } catch { return false; }
     }
-
-    // ---------- client ----------
 
     public static Dictionary<string, object> Call(string action, int timeout) {
         try { return CallOnce(action, timeout); }
@@ -85,8 +82,6 @@ public static class Helper {
         }
     }
 
-    // ---------- elevation from the GUI ----------
-
     public static void InstallElevated() {
         string sid = WindowsIdentity.GetCurrent().User.Value;
         RunElevated("--install-helper " + sid + " " + Core.Quote(Core.Data));
@@ -110,8 +105,6 @@ public static class Helper {
             if (p.ExitCode != 0) throw new UserFacingException("The elevated action did not finish. Details were shown in a separate window.");
         }
     }
-
-    // ---------- elevated install / uninstall ----------
 
     public static void Install(string sid, string data) {
         if (!Core.Elevated) throw new Exception("Administrator rights are required.");
@@ -205,8 +198,6 @@ public static class Helper {
         var c = Core.Read<Dictionary<string, object>>(ConfigPath);
         return new Dictionary<string, string> { { "sid", Convert.ToString(c["sid"]) }, { "data", Convert.ToString(c["data"]) } };
     }
-
-    // ---------- service side ----------
 
     public static Dictionary<string, object> RunScript(string action, string data) {
         string result = Path.Combine(Core.StateDir, "result.json");

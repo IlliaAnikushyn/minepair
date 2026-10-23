@@ -16,7 +16,6 @@ public static class SelfTests {
     static void CreateHandles(Control c) { var handle = c.Handle; foreach (Control child in c.Controls) CreateHandles(child); c.PerformLayout(); }
     static string Key(int start) { return Convert.ToBase64String(Enumerable.Range(start, 32).Select(x => (byte)x).ToArray()); }
 
-    // Builds a host and a client profile in separate folders; returns to the host folder.
     static Settings Profile(string dir, string role, string publicKey) {
         Core.Data = dir;
         var s = Core.Load();
@@ -44,7 +43,6 @@ public static class SelfTests {
             Check(Core.IsPrivateDirectory(hostDir) && File.GetAccessControl(Path.Combine(hostDir, "probe.txt")).GetSecurityDescriptorSddlForm(System.Security.AccessControl.AccessControlSections.Access) == probeAcl, "loading settings again leaves an already private folder alone");
             File.Delete(Path.Combine(hostDir, "probe.txt"));
 
-            // validation
             foreach (var ip in new[] { "192.168.1.1", "100.64.0.1", "10.0.0.2", "127.0.0.1", "169.254.5.1", "203.0.113.4", "0.0.0.0", "224.0.0.1" }) Check(!Core.PublicIp(ip), "reject non-public endpoint " + ip);
             foreach (var nick in new[] { "ab", "has space", "nick\nstop", "../../../world", "@everyone" }) Reject(() => Core.Nick(nick), "reject malformed nickname");
             Reject(() => Core.Key(new string('A', 44)), "reject all-zero key");
@@ -54,7 +52,6 @@ public static class SelfTests {
             string generated = Core.NewPrivateKey();
             Check(Core.IsKey(generated) && Core.IsKey(Core.PublicKeyFor(generated)) && Core.NewPrivateKey() != generated, "fresh key pairs generated without wg.exe");
 
-            // pairing codes: invite → client, reply → host, address update → client
             Core.Data = hostDir;
             string invite = Core.InviteCode(host);
             Check(invite.StartsWith("MP-") && invite.Length < 200, "invite code is short text (" + invite.Length + " chars)");
@@ -84,7 +81,6 @@ public static class SelfTests {
             var stranger = new Settings { Role = "host", HostNick = "Other_Host", FriendNick = "Friend_Two", Endpoint = "9.9.9.9", PublicKey = Key(100), HostIp = "10.203.20.5", FriendIp = "10.203.20.6" };
             Reject(() => Core.ApplyCode(client, Core.InviteCode(stranger), null), "invite from another host rejected while paired");
 
-            // tunnel configuration
             Core.Data = hostDir;
             string config = Core.TunnelText(host, host.PublicKey);
             Check(config.Contains("AllowedIPs = " + host.FriendIp + "/32") && config.Contains("ListenPort = 51820"), "host restricts peer to one /32");
@@ -102,7 +98,6 @@ public static class SelfTests {
                 Check(!Native.PipeServerIsService(probe), "pipe served by a user process is not trusted as the helper");
             }
 
-            // worlds
             var world = Core.CreateWorld("Test world", "26.3", "creative", "hard", true, false, "Grüße seed");
             host.ActiveWorld = world.Id;
             Core.Save(host);
@@ -116,7 +111,6 @@ public static class SelfTests {
             Reject(() => Core.CreateWorld("x", "../26", "survival", "normal", false, true, ""), "path-like version rejected");
             Check(Core.Worlds().Count == 1 && Core.GetWorld(world.Id).Name == "Test world", "world list reads saved world");
 
-            // backups
             string worldFolder = Path.Combine(Core.WorldDir(world.Id), "world");
             Directory.CreateDirectory(Path.Combine(worldFolder, "region"));
             File.WriteAllText(Path.Combine(worldFolder, "level.dat"), "original");
@@ -137,7 +131,6 @@ public static class SelfTests {
             using (var z = ZipFile.Open(ads, ZipArchiveMode.Create)) using (var w = new StreamWriter(z.CreateEntry("file:stream").Open())) w.Write("bad");
             Reject(() => Core.Extract(ads, Path.Combine(temp, "stage2")), "NTFS alternate stream rejected");
 
-            // migration from version 1 (.local next to the exe)
             string legacy = Path.Combine(temp, "old", ".local");
             Directory.CreateDirectory(Path.Combine(legacy, "server", "world"));
             Directory.CreateDirectory(Path.Combine(legacy, "java", "jdk-25.0.4.1+1-jre", "bin"));
