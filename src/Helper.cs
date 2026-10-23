@@ -212,8 +212,10 @@ public static class Helper {
         if (action == "version") return new Dictionary<string, object> { { "hash", OwnHash() } };
         if (action == "status") return Status(data);
         string mapped = action == "install-wireguard" ? "install" : action;
-        RunScript(mapped, data);
-        return new Dictionary<string, object>();
+        var r = RunScript(mapped, data);
+        var result = new Dictionary<string, object>();
+        if (r.ContainsKey("warning") && r["warning"] != null) result["warning"] = Convert.ToString(r["warning"]);
+        return result;
     }
 
     // Seconds since the last WireGuard handshake with the paired key; -1 when there has been none yet.

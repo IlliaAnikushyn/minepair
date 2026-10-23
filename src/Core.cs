@@ -358,11 +358,14 @@ public static class Core {
 
     // The configuration holds the private key under machine-wide DPAPI (the SYSTEM WireGuard service must read it),
     // so it is protected only by folder permissions. It exists just while the helper validates and copies it.
-    public static void StartTunnel(Settings s, int timeout) {
+    // Returns a warning to show the user (the router did not accept the UPnP rule), or null.
+    public static string StartTunnel(Settings s, int timeout) {
         PrivateDirectory(ProtectedDir);
         Atomic(TunnelFilePath(s), Native.Protect(Encoding.UTF8.GetBytes(TunnelText(s, PrivateKey())), s.TunnelName()));
-        try { Helper.Call("start", timeout); }
-        finally { DeleteTunnelFile(s); }
+        try {
+            var r = Helper.Call("start", timeout);
+            return r.ContainsKey("warning") ? Convert.ToString(r["warning"]) : null;
+        } finally { DeleteTunnelFile(s); }
     }
 
     public static void DeleteTunnelFile(Settings s) {
@@ -964,7 +967,7 @@ public static class Core {
         if (File.Exists(UncleanMarker)) File.Delete(UncleanMarker);
     }
 
-    public static void StartServer(Settings s, int owner) {
+    public static string StartServer(Settings s, int owner) {
         if (Elevated) throw new UserFacingException("Start MinePair with a normal double-click, without administrator rights.");
         Validate(s, true);
         var w = ActiveWorld(s);
@@ -977,13 +980,13 @@ public static class Core {
         Save(s);
         Backup(w, "auto");
         ServerProperties(s, w);
-        StartTunnel(s, 180000);
+        string warning = StartTunnel(s, 180000);
         try {
             if (File.Exists(StopRequest)) File.Delete(StopRequest);
             Process.Start(new ProcessStartInfo(ExePath, "--server-worker " + owner + " " + w.Id) { UseShellExecute = false, CreateNoWindow = true });
             var sw = Stopwatch.StartNew();
             while (sw.ElapsedMilliseconds < 15000) {
-                if (SupervisorAlive()) return;
+                if (SupervisorAlive()) return warning;
                 Thread.Sleep(100);
             }
             throw new UserFacingException("The server did not start. See the server log (Settings → Server log).");

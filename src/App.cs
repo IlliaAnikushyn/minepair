@@ -500,7 +500,8 @@ public sealed class MainForm : Form {
             MarkRouterReady();
         }));
         Gap(p, 8);
-        Primary(p, "Done, the port is open", MarkRouterReady);
+        // A manual rule replaces UPnP. If our UPnP rule cannot be removed now, the next stop removes it.
+        Primary(p, "Done, the port is open", () => Run(() => { try { Helper.Call("router-remove", 120000); } catch { } }, MarkRouterReady));
     }
 
     void MarkRouterReady() {
@@ -725,6 +726,7 @@ public sealed class MainForm : Form {
             if (unclean && !Ask("The last session ended unexpectedly (for example, the computer turned off).\n\nThe world is usually fine — Minecraft saves it every few minutes. A backup is made before starting. Continue?")) return;
             int pid = Process.GetCurrentProcess().Id;
             bool endpointChanged = false;
+            string routerWarning = null;
             SetState("Starting…", Ui.Yellow, "Checking files and turning on the secure network…", "■   Stop", Ui.Red);
             Run(() => {
                 if (unclean) Core.ClearUncleanSession(settings);
@@ -736,10 +738,14 @@ public sealed class MainForm : Form {
                     if (ip != settings.Endpoint) { settings.Endpoint = ip; Core.Save(settings); endpointChanged = true; }
                 } catch { }
                 OnUi(() => detailLabel.Text = "Turning on the secure network and starting the server…");
-                Core.StartServer(settings, pid);
+                routerWarning = Core.StartServer(settings, pid);
             }, () => {
                 serverWasRunning = true;
-                if (endpointChanged) ShowEndpointBanner();
+                if (routerWarning != null)
+                    ShowBanner(routerWarning + "\nYour friend cannot connect until UDP " + settings.Port + " is forwarded to this computer."
+                        + (endpointChanged ? "\n\nYour public IP also changed. Send your friend this code:" : ""),
+                        endpointChanged ? Core.UpdateCode(settings) : null, B("Router instructions", ShowRouter));
+                else if (endpointChanged) ShowEndpointBanner();
                 CheckLan();
                 Poll();
             }, () => Apply(new Status { Server = Core.SupervisorAlive(), Tunnel = Core.TunnelServiceExists(settings) }), true);

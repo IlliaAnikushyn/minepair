@@ -17,6 +17,7 @@ $wgTool = Join-Path $env:ProgramFiles 'WireGuard\wg.exe'
 # Exact WireGuard LLC EV certificate subject (company registration number pinned).
 $signerPattern = '\ACN=WireGuard LLC, O=WireGuard LLC, .*SERIALNUMBER=4227913\z'
 $script:journal = $null
+$script:warning = $null
 
 function Save-Json([string]$Path, $Value) {
     $text = $Value | ConvertTo-Json -Depth 8
@@ -85,6 +86,21 @@ function Remove-OwnRouterRule {
     $mappings.Remove([int]$script:journal.routerPort, 'UDP')
     $script:journal.routerOwned = $false; Save-Journal; Log-Change 'Removed own UPnP mapping'
 }
+function Add-OwnRouterRule($s, $n) {
+    # The journal records intent before the router call, so it may claim a rule that was never created.
+    Remove-OwnRouterRule
+    $nat = New-Object -ComObject HNetCfg.NATUPnP
+    $mappings = $nat.StaticPortMappingCollection
+    if ($null -eq $mappings) { throw 'UPnP is off on the router. Add one UDP rule by hand following the instructions.' }
+    $existing = @($mappings | Where-Object { $_.ExternalPort -eq [int]$s.Port -and $_.Protocol -eq 'UDP' })
+    if ($existing.Count) { throw 'This UDP port is already used by a router rule. The other rule was left unchanged.' }
+    $local = @(Physical-LanAddresses)
+    if ($local.Count -ne 1) { throw 'Could not determine a single local address. Add the rule by hand.' }
+    $script:journal.routerPort = [int]$s.Port; $script:journal.routerClient = $local[0]; $script:journal.routerDescription = $n.Tunnel; $script:journal.routerOwned = $true
+    Save-Journal
+    $mappings.Add([int]$s.Port, 'UDP', [int]$s.Port, $local[0], $true, $n.Tunnel) | Out-Null
+    Log-Change 'Added own UPnP UDP mapping'
+}
 # Removes the tunnel service, its protected config copy and the firewall group for one profile id.
 function Remove-OwnTunnel([string]$Id) {
     $n = Names $Id
@@ -125,8 +141,10 @@ try {
     Check-Settings $s
     New-Item -ItemType Directory -Force -Path $tunnelDir | Out-Null
     if (Test-Path -LiteralPath $journalPath) { $script:journal = Get-Content -LiteralPath $journalPath -Raw | ConvertFrom-Json }
-    else { $script:journal = [pscustomobject]@{schema=1;id=$s.Id;installedWireGuard=$false;productCode='';active=$false;routerOwned=$false;routerPort=0;routerClient='';routerDescription=''} }
+    else { $script:journal = [pscustomobject]@{schema=1;id=$s.Id;installedWireGuard=$false;productCode='';active=$false;routerOwned=$false;routerWanted=$false;routerPort=0;routerClient='';routerDescription=''} }
     if ($script:journal.schema -ne 1 -or [string]$script:journal.id -notmatch '\A[a-f0-9]{12}\z') { throw 'The network journal is damaged.' }
+    # Journals from 0.3.1 and earlier: a rule that exists now was added through UPnP on purpose.
+    if (!$script:journal.PSObject.Properties['routerWanted']) { $script:journal | Add-Member -NotePropertyName routerWanted -NotePropertyValue ([bool]$script:journal.routerOwned) }
     # The friend adopts the host's profile id when pairing: clean up anything left under the old id, then follow the new one.
     if ($script:journal.id -ne $s.Id) {
         if ($script:journal.active) { Stop-OwnNetwork }
@@ -202,6 +220,11 @@ try {
                 $routes = & $wgTool show $n.Tunnel allowed-ips 2>&1
                 if ($LASTEXITCODE -ne 0 -or ($routes -join '') -match '0\.0\.0\.0/0|::/0') { throw 'Could not verify the restricted tunnel routes.' }
                 Log-Change 'Own tunnel active with restricted /32 routes and interface-scoped firewall rules'
+                # The host may have added a manual rule meanwhile, so a router failure warns instead of blocking the game.
+                if ($s.Role -eq 'host' -and $script:journal.routerWanted) {
+                    try { Add-OwnRouterRule $s $n }
+                    catch { $script:warning = 'The router did not open the port automatically: ' + $_.Exception.Message; Log-Change $script:warning }
+                }
             } catch {
                 $reason = $_.Exception.Message
                 try { Stop-OwnNetwork } catch { $reason += '; rollback: ' + $_.Exception.Message }
@@ -227,23 +250,16 @@ try {
         }
         'router-add' {
             if ($s.Role -ne 'host') { throw 'Only the host needs a router rule.' }
-            # The journal records intent before the router call, so it may claim a rule that was never created.
-            Remove-OwnRouterRule
-            $nat = New-Object -ComObject HNetCfg.NATUPnP
-            $mappings = $nat.StaticPortMappingCollection
-            if ($null -eq $mappings) { throw 'UPnP is off on the router. Add one UDP rule by hand following the instructions.' }
-            $existing = @($mappings | Where-Object { $_.ExternalPort -eq [int]$s.Port -and $_.Protocol -eq 'UDP' })
-            if ($existing.Count) { throw 'This UDP port is already used by a router rule. The other rule was left unchanged.' }
-            $local = @(Physical-LanAddresses)
-            if ($local.Count -ne 1) { throw 'Could not determine a single local address. Add the rule by hand.' }
-            $script:journal.routerPort = [int]$s.Port; $script:journal.routerClient = $local[0]; $script:journal.routerDescription = $n.Tunnel; $script:journal.routerOwned = $true
-            Save-Journal
-            $mappings.Add([int]$s.Port, 'UDP', [int]$s.Port, $local[0], $true, $n.Tunnel) | Out-Null
-            Log-Change 'Added own UPnP UDP mapping'
+            # Wanted for every later start too: stop removes the rule, start puts it back.
+            $script:journal.routerWanted = $true; Save-Journal
+            Add-OwnRouterRule $s $n
         }
-        'router-remove' { Remove-OwnRouterRule }
+        'router-remove' {
+            $script:journal.routerWanted = $false; Save-Journal
+            Remove-OwnRouterRule
+        }
     }
-    Save-Json $resultPath @{ ok = $true; action = $Action; time = (Get-Date -Format o) }
+    Save-Json $resultPath @{ ok = $true; action = $Action; time = (Get-Date -Format o); warning = $script:warning }
     exit 0
 } catch {
     $message = $_.Exception.Message
