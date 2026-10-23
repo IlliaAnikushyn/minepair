@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 - A router rule created through UPnP was removed on the first stop and never added again, so the friend could connect only once. Every start now adds it back; a refusal by the router shows a warning instead of blocking the game.
+- The secure network stayed on when Java failed to start or exited while the server was being asked to stop.
 - Retrying "Try automatically (UPnP)" after a failed attempt reported success without creating the router rule.
 
 ## [0.3.1] - 2026-10-23

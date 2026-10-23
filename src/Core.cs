@@ -1025,44 +1025,51 @@ public static class Core {
             Write(SessionFile, new { pid = own.Id, started = own.StartTime.ToUniversalTime().Ticks });
             Directory.CreateDirectory(LogsDir);
             string logPath = Path.Combine(LogsDir, "server-console.log");
-            if (File.Exists(logPath) && new FileInfo(logPath).Length > 10 * 1024 * 1024) File.Copy(logPath, logPath + ".old", true);
-            using (var log = new StreamWriter(logPath, new FileInfo(logPath).Exists && new FileInfo(logPath).Length <= 10 * 1024 * 1024, Encoding.UTF8)) {
-                log.AutoFlush = true;
-                object gate = new object();
-                log.WriteLine("=== " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " · " + w.Name + " · " + w.Version + " ===");
-                var info = new ProcessStartInfo(java, "-Xms1G -Xmx" + s.MemoryMb + "M -jar " + Quote(ServerJar(w)) + " nogui") {
-                    WorkingDirectory = WorldDir(w.Id), UseShellExecute = false, CreateNoWindow = true,
-                    RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
-                    StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
-                };
-                using (var p = new Process { StartInfo = info }) {
-                    p.OutputDataReceived += (o, e) => { if (e.Data != null) lock (gate) log.WriteLine(e.Data); };
-                    p.ErrorDataReceived += (o, e) => { if (e.Data != null) lock (gate) log.WriteLine(e.Data); };
-                    p.Start();
-                    p.BeginOutputReadLine();
-                    p.BeginErrorReadLine();
-                    bool stopSent = false;
-                    while (!p.WaitForExit(500)) {
-                        bool ownerGone;
-                        try { ownerGone = parent == null || parent.HasExited; } catch { ownerGone = true; }
-                        if (!stopSent && (ownerGone || File.Exists(StopRequest))) {
-                            p.StandardInput.WriteLine("stop");
-                            p.StandardInput.Flush();
-                            stopSent = true;
-                        }
-                    }
-                    p.WaitForExit();
-                    if (p.ExitCode == 0 && stopSent) File.Delete(UncleanMarker);
-                }
+            try {
+                RunServer(s, w, java, parent, logPath);
+            } finally {
                 // The tunnel exists only for this server. Take it down here as well, so it does not stay up
-                // when the GUI crashed or was killed and nobody else is left to stop it.
+                // when the GUI crashed or was killed, or Java failed to start, and nobody else is left to stop it.
                 try { Helper.Call("stop", 120000); }
-                catch (Exception e) { log.WriteLine("MinePair: could not turn off the secure network: " + e.Message); }
+                catch (Exception e) { try { File.AppendAllText(logPath, "MinePair: could not turn off the secure network: " + e.Message + Environment.NewLine); } catch { } }
+                File.Delete(SessionFile);
+                if (File.Exists(StopRequest)) File.Delete(StopRequest);
             }
-            File.Delete(SessionFile);
-            if (File.Exists(StopRequest)) File.Delete(StopRequest);
         }
         if (parent != null) parent.Dispose();
+    }
+
+    static void RunServer(Settings s, World w, string java, Process parent, string logPath) {
+        if (File.Exists(logPath) && new FileInfo(logPath).Length > 10 * 1024 * 1024) File.Copy(logPath, logPath + ".old", true);
+        using (var log = new StreamWriter(logPath, new FileInfo(logPath).Exists && new FileInfo(logPath).Length <= 10 * 1024 * 1024, Encoding.UTF8)) {
+            log.AutoFlush = true;
+            object gate = new object();
+            log.WriteLine("=== " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " · " + w.Name + " · " + w.Version + " ===");
+            var info = new ProcessStartInfo(java, "-Xms1G -Xmx" + s.MemoryMb + "M -jar " + Quote(ServerJar(w)) + " nogui") {
+                WorkingDirectory = WorldDir(w.Id), UseShellExecute = false, CreateNoWindow = true,
+                RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
+                StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
+            };
+            using (var p = new Process { StartInfo = info }) {
+                p.OutputDataReceived += (o, e) => { if (e.Data != null) lock (gate) log.WriteLine(e.Data); };
+                p.ErrorDataReceived += (o, e) => { if (e.Data != null) lock (gate) log.WriteLine(e.Data); };
+                p.Start();
+                p.BeginOutputReadLine();
+                p.BeginErrorReadLine();
+                bool stopSent = false;
+                while (!p.WaitForExit(500)) {
+                    bool ownerGone;
+                    try { ownerGone = parent == null || parent.HasExited; } catch { ownerGone = true; }
+                    if (!stopSent && (ownerGone || File.Exists(StopRequest))) {
+                        // Java may exit between the wait and the write; the closed pipe then needs no stop.
+                        try { p.StandardInput.WriteLine("stop"); p.StandardInput.Flush(); } catch (IOException) { }
+                        stopSent = true;
+                    }
+                }
+                p.WaitForExit();
+                if (p.ExitCode == 0 && stopSent) File.Delete(UncleanMarker);
+            }
+        }
     }
 
     // ---------- diagnostics ----------
