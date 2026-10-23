@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-23
+
 ### Fixed
 - Setup failed with "Another program is pretending to be the MinePair helper": the pipe check could not open the SYSTEM service process as a standard user and rejected the real helper. The session is now read from the pipe itself.
 
@@ -49,7 +51,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - Verified downloads of the vanilla server, Temurin Java and WireGuard.
 - Backups, restore and rollback of all own network changes.
 
-[Unreleased]: https://github.com/IlliaAnikushyn/MinePair/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/IlliaAnikushyn/MinePair/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/IlliaAnikushyn/MinePair/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/IlliaAnikushyn/MinePair/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/IlliaAnikushyn/MinePair/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/IlliaAnikushyn/MinePair/releases/tag/v0.1.0
