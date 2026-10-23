@@ -14,6 +14,9 @@ All notable changes to this project are documented here. The format follows [Kee
 - The status was refreshed up to 3 s late after Play, Stop or Connect, and pressing Play during another action showed "Starting…" without starting anything.
 - Retrying "Try automatically (UPnP)" after a failed attempt reported success without creating the router rule.
 
+### Changed
+- Stop no longer runs the network shutdown a second time when the server has already turned the secure network off.
+
 ## [0.3.1] - 2026-10-23
 
 ### Fixed

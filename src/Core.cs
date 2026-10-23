@@ -385,6 +385,13 @@ public static class Core {
         } catch { return false; }
     }
 
+    // Also true for a stopped service, which may still have firewall rules next to it.
+    static bool TunnelServiceInstalled(Settings s) {
+        try {
+            using (var sc = new ServiceController("WireGuardTunnel$" + s.TunnelName())) { var status = sc.Status; return true; }
+        } catch { return false; }
+    }
+
     // ---------- pairing codes ----------
     // A code is "MP-" + base64url(kind | body | first 4 bytes of SHA-256(kind | body)).
     // Codes carry only public data: the checksum catches copy/paste damage, the pinned keys provide security.
@@ -1010,7 +1017,8 @@ public static class Core {
             while (SupervisorAlive() && sw.Elapsed.TotalSeconds < 120) Thread.Sleep(300);
             if (SupervisorAlive()) throw new UserFacingException("The server is still saving the world. Wait a minute and press \"Stop\" again.");
         }
-        Helper.Call("stop", 120000);
+        // The supervisor normally turns the network off itself before exiting.
+        if (TunnelServiceInstalled(Load())) Helper.Call("stop", 120000);
     }
 
     public static void RequestStop() {
