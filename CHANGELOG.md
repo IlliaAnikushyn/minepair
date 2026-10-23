@@ -15,6 +15,9 @@ All notable changes to this project are documented here. The format follows [Kee
 - Retrying "Try automatically (UPnP)" after a failed attempt reported success without creating the router rule.
 - Saving settings or world files could fail with "file in use" while antivirus software scanned the previous version.
 
+### Added
+- A damaged profile no longer blocks every start: MinePair offers to set it aside and run the setup again, keeping worlds, backups and keys.
+
 ### Changed
 - Stop no longer runs the network shutdown a second time when the server has already turned the secure network off.
 

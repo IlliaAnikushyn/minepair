@@ -46,6 +46,7 @@ static class Program {
                     return 1;
                 }
                 Core.MigrateLegacy(Path.Combine(Path.GetDirectoryName(Core.ExePath), ".local"));
+                if (!ProfileUsable()) return 1;
                 Application.Run(new MainForm());
             }
             return 0;
@@ -57,6 +58,21 @@ static class Program {
             } catch { }
             if (mode == "" || mode == "--install-helper" || mode == "--uninstall-helper") MessageBox.Show(e.Message, "MinePair");
             return 1;
+        }
+    }
+
+    // A damaged settings.json would stop every start. Keys, worlds and backups live in other files,
+    // so the profile can be set aside and the wizard run again; only the code exchange is repeated.
+    static bool ProfileUsable() {
+        if (!File.Exists(Core.Config)) return true;
+        try {
+            Core.Validate(Core.Read<Settings>(Core.Config), false);
+            return true;
+        } catch (Exception e) {
+            if (MessageBox.Show("The MinePair profile could not be read: " + e.Message + "\n\nSet it aside and run the setup again? Worlds, backups and keys are kept; you and your friend exchange codes again.",
+                "MinePair", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return false;
+            File.Move(Core.Config, Core.Config + ".damaged-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+            return true;
         }
     }
 }
