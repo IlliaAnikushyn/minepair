@@ -18,7 +18,7 @@ cd MinePair
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Test
 ```
 
-`build.ps1` compiles every file in `src/` with `csc.exe` from .NET Framework and embeds `src/Network.ps1` as a resource. `-Test` runs `dist\MinePair.exe --self-test`; the report is `dist\artifacts\tests.txt` and screenshots of every screen are written next to it.
+`build.ps1` compiles every file in `src/` with `csc.exe` from .NET Framework and embeds `src/Network.ps1` as a resource. `-Test` runs `dist\MinePair.exe --self-test`; the report is `dist\artifacts\tests.txt` and screenshots of every screen are written next to it. It then runs `tests\Network.Tests.ps1`, which loads only the function definitions of `Network.ps1` and replaces the router with an object in memory.
 
 The self-tests must never change the system. Anything that touches services, the firewall, WireGuard or the router has to be tested by hand — describe what you checked in the pull request.
 

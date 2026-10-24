@@ -153,7 +153,7 @@ No SDK is needed — the build uses the C# compiler that ships with .NET Framewo
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Test
 ```
 
-The result is `dist\MinePair.exe`. `-Test` runs the self-tests (`MinePair.exe --self-test`): key derivation against the RFC 7748 vectors, pairing codes, validation, tunnel configuration, ACLs, worlds, backups and restore, archive path traversal, legacy migration, offscreen rendering of every screen, and a parse check of the embedded PowerShell script. They change nothing on the system; the report and screenshots are written to `dist\artifacts`.
+The result is `dist\MinePair.exe`. `-Test` runs the self-tests (`MinePair.exe --self-test`): key derivation against the RFC 7748 vectors, pairing codes, validation, tunnel configuration, ACLs, worlds, backups and restore, archive path traversal, legacy migration, offscreen rendering of every screen, and a parse check of the embedded PowerShell script. `tests\Network.Tests.ps1` then checks the router and journal logic of `Network.ps1` against a simulated UPnP router. Neither changes anything on the system; the report and screenshots are written to `dist\artifacts`.
 
 ## Project structure
 
@@ -165,6 +165,7 @@ src/Core.cs           profile, keys (X25519), pairing codes, downloads, worlds, 
 src/Helper.cs         elevated install/uninstall and the SYSTEM helper service (named pipe)
 src/Network.ps1       tunnel, firewall and UPnP operations run by the helper (embedded in the exe)
 src/SelfTests.cs      self-test suite
+tests/Network.Tests.ps1  router and journal logic of Network.ps1 with a simulated router
 docs/SPEC.md          requirements, design decisions and verification notes
 ```
 

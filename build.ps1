@@ -19,5 +19,8 @@ if ($Test) {
     $testProcess = Start-Process -FilePath (Join-Path $out 'MinePair.exe') -ArgumentList '--self-test' -Wait -PassThru
     Get-Content -LiteralPath (Join-Path $out 'artifacts\tests.txt')
     if ($testProcess.ExitCode -ne 0) { throw 'Self-tests failed; see dist\artifacts\tests.txt' }
+    $powershell = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    & $powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'tests\Network.Tests.ps1') -Script (Join-Path $root 'src\Network.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Network script tests failed' }
 }
 Write-Output (Join-Path $out 'MinePair.exe')
