@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-24
+
 ### Fixed
 - A router rule created through UPnP was removed on the first stop and never added again, so the friend could connect only once. Every start now adds it back; a refusal by the router shows a warning instead of blocking the game.
 - The secure network stayed on when Java failed to start or exited while the server was being asked to stop.
@@ -68,7 +70,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - Verified downloads of the vanilla server, Temurin Java and WireGuard.
 - Backups, restore and rollback of all own network changes.
 
-[Unreleased]: https://github.com/IlliaAnikushyn/MinePair/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/IlliaAnikushyn/MinePair/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/IlliaAnikushyn/MinePair/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/IlliaAnikushyn/MinePair/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/IlliaAnikushyn/MinePair/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/IlliaAnikushyn/MinePair/compare/v0.1.0...v0.2.0
